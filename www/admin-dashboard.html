@@ -633,6 +633,13 @@ window.__orbitEnsureChart = function(){ return window.__orbitLoadScript('https:/
   .sidebar-logo-fixed img{height:36px;width:auto;display:block;object-fit:contain;}
   .sidebar-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
+
+  /* Native mobile feel */
+  html,body{-webkit-tap-highlight-color:transparent}
+  .btn,.nav-item{transition:transform .12s ease,opacity .12s ease}
+  .btn:active,.nav-item:active{transform:scale(.97);opacity:.92}
+  .modal-bg.open{animation:orbitFadeIn .18s ease}
+  @keyframes orbitFadeIn{from{opacity:0}to{opacity:1}}
 </style>
 
 <style id="orbit-scroll-fix">
@@ -4675,6 +4682,22 @@ function orbitPlugin(name){
 }
 /** Save blob to device Downloads/Documents and optionally open system share (WhatsApp, Drive, etc.) */
 async function orbitSaveFile(blob, filename, opts){
+  opts = opts || {};
+  // When share requested, open system sheet (WhatsApp, Drive, Files, Gallery)
+  if(opts.share && blob && typeof window.__orbitNativeShare === "function"){
+    try{
+      var ok = await window.__orbitNativeShare({
+        blob: blob,
+        filename: filename,
+        title: opts.title || filename,
+        text: opts.text || "OrbitBills export",
+        mime: opts.mime || (blob && blob.type) || "application/octet-stream",
+        dialogTitle: opts.dialogTitle || "Share / save file"
+      });
+      if(ok) return { ok: true, native: true, shared: true };
+    }catch(eSharePref){ console.warn(eSharePref); }
+  }
+
   opts = opts || {};
   filename = filename || ("orbitbills-" + Date.now());
   var mime = (blob && blob.type) || opts.mime || "application/octet-stream";

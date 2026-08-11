@@ -4,7 +4,7 @@
   function hasCap(){ return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
   function plugin(n){ try{ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[n]; }catch(e){ return null; } }
 
-  // Live site used when phone is online (hybrid mode). Keep in sync with app-config.json websiteUrl.
+  // Must match app-config.json websiteUrl
   var LIVE_URL = "https://orbitbillsphone.onrender.com";
   var PREFER_LIVE = true;
 
@@ -12,7 +12,7 @@
     try{
       var h = (location.hostname||"").toLowerCase();
       if(!h) return false;
-      return h.indexOf("onrender.com") >= 0 || h === "orbitbillsphone.onrender.com";
+      return h.indexOf("onrender.com") >= 0;
     }catch(e){ return false; }
   }
   function isLocalCapOrigin(){
@@ -28,11 +28,8 @@
   async function tryHybridLiveRedirect(){
     if(!hasCap() || !PREFER_LIVE) return false;
     if(isOnLiveHost()) return false;
-    // Only redirect from local bundle origins
     if(!isLocalCapOrigin() && location.protocol !== "file:") return false;
-    try{
-      if(sessionStorage.getItem("orbit_skip_live_redirect") === "1") return false;
-    }catch(e){}
+    try{ if(sessionStorage.getItem("orbit_skip_live_redirect") === "1") return false; }catch(e){}
     var online = navigator.onLine;
     try{
       var Network = plugin("Network");
@@ -42,12 +39,10 @@
       }
     }catch(e){}
     if(!online) return false;
+    try{ sessionStorage.setItem("orbit_live_redirected","1"); }catch(e){}
     try{
-      // Remember we are going live so back doesn't loop oddly
-      sessionStorage.setItem("orbit_live_redirected","1");
-    }catch(e){}
-    try{
-      window.location.replace(LIVE_URL.replace(/\/$/,"") + (location.pathname && location.pathname !== "/" ? location.pathname : "/index.html") + (location.search||"") + (location.hash||""));
+      var path = (location.pathname && location.pathname !== "/") ? location.pathname : "/index.html";
+      window.location.replace(LIVE_URL.replace(/\/$/,"") + path + (location.search||"") + (location.hash||""));
     }catch(e){
       try{ window.location.href = LIVE_URL; }catch(e2){}
     }
@@ -130,32 +125,22 @@
     if(ok) ok.addEventListener("click", hideOfflineModal);
   }
   function showOfflineModal(){
-    try{
-      if(sessionStorage.getItem("orbit_offline_modal_dismissed") === "1") return;
-    }catch(e){}
+    try{ if(sessionStorage.getItem("orbit_offline_modal_dismissed") === "1") return; }catch(e){}
     ensureOfflineModal();
     var wrap = document.getElementById("orbitOfflineModal");
-    if(wrap){
-      wrap.style.display = "flex";
-      wrap.setAttribute("aria-hidden","false");
-    }
+    if(wrap){ wrap.style.display = "flex"; wrap.setAttribute("aria-hidden","false"); }
   }
   function hideOfflineModal(){
     var wrap = document.getElementById("orbitOfflineModal");
-    if(wrap){
-      wrap.style.display = "none";
-      wrap.setAttribute("aria-hidden","true");
-    }
+    if(wrap){ wrap.style.display = "none"; wrap.setAttribute("aria-hidden","true"); }
     try{ sessionStorage.setItem("orbit_offline_modal_dismissed","1"); }catch(e){}
   }
 
   async function ready(){
-    // Hybrid: if native + online + still on local bundle → open live link so website updates appear
     try{
       var redirected = await tryHybridLiveRedirect();
       if(redirected) return true;
     }catch(e){}
-
     if(!hasCap()){ setupNetwork(); setupBackButton(); try{ ensureNavFill("#ffffff"); }catch(e){} return false; }
     await setChromeColors();
     try{ var Splash=plugin("SplashScreen"); if(Splash&&Splash.hide) await Splash.hide({fadeOutDuration:250}); }catch(e){}
@@ -188,7 +173,6 @@
         bar.setAttribute("data-dismissed","1");
       });
       bar.appendChild(x);
-      bar.style.position="fixed";
       (document.body||document.documentElement).appendChild(bar);
     }
     function isDismissed(){
@@ -200,19 +184,14 @@
         bar.style.display="none";
         try{ sessionStorage.removeItem("orbit_offline_banner_dismissed"); }catch(e){}
         bar.removeAttribute("data-dismissed");
-        // If we came back online while still on local bundle, try live redirect once
         try{
           if(hasCap() && PREFER_LIVE && !isOnLiveHost() && (isLocalCapOrigin() || location.protocol === "file:")){
-            if(sessionStorage.getItem("orbit_live_redirected") !== "1"){
-              tryHybridLiveRedirect();
-            }
+            if(sessionStorage.getItem("orbit_live_redirected") !== "1") tryHybridLiveRedirect();
           }
         }catch(e){}
         return;
       }
-      if(isDismissed()){ bar.style.display="none"; }
-      else { bar.style.display="block"; }
-      // Popup once per session when offline
+      if(isDismissed()){ bar.style.display="none"; } else { bar.style.display="block"; }
       try{ showOfflineModal(); }catch(e){}
     }
     if(Network&&Network.getStatus){
@@ -248,21 +227,77 @@
       else if(H.impact) await H.impact({style:"LIGHT"});
     }catch(e){}
   };
+
+  /** Share file (PNG/PDF/CSV) via Android share sheet — WhatsApp, Drive, Gallery, etc. */
   window.__orbitNativeShare=async function(opts){
     opts=opts||{};
-    var Share=plugin("Share"); var Filesystem=plugin("Filesystem");
-    if(Share&&Share.share&&Filesystem&&opts.blob&&opts.filename){
-      var b64=await new Promise(function(resolve,reject){ var r=new FileReader(); r.onload=function(){ var s=String(r.result||""); var i=s.indexOf(","); resolve(i>=0?s.slice(i+1):s); }; r.onerror=reject; r.readAsDataURL(opts.blob); });
-      var path="OrbitBills/"+opts.filename;
-      await Filesystem.writeFile({path:path,data:b64,directory:"CACHE",recursive:true});
-      var uriRes=await Filesystem.getUri({path:path,directory:"CACHE"});
-      var uri=uriRes&&(uriRes.uri||uriRes);
-      await Share.share({title:opts.title||"OrbitBills",text:opts.text||"",url:uri,dialogTitle:"Share"});
-      return true;
-    }
-    if(navigator.share){ await navigator.share({title:opts.title,text:opts.text,url:opts.url}); return true; }
+    var title = opts.title || "OrbitBills";
+    var text = opts.text || "";
+    var filename = opts.filename || "file.bin";
+    var blob = opts.blob || null;
+    var dialogTitle = opts.dialogTitle || "Share";
+
+    // Prefer Capacitor Share with file URI (attaches file in WhatsApp / Drive / Photos)
+    try{
+      if(hasCap() && blob){
+        var Share=plugin("Share"); var Filesystem=plugin("Filesystem");
+        if(Share && Share.share && Filesystem && Filesystem.writeFile){
+          var b64=await new Promise(function(resolve,reject){
+            var r=new FileReader();
+            r.onload=function(){ var s=String(r.result||""); var i=s.indexOf(","); resolve(i>=0?s.slice(i+1):s); };
+            r.onerror=reject; r.readAsDataURL(blob);
+          });
+          var path="OrbitBills/"+filename;
+          var dirs=["CACHE","DATA","DOCUMENTS","EXTERNAL","EXTERNAL_STORAGE"];
+          var uri=null;
+          for(var i=0;i<dirs.length && !uri;i++){
+            try{
+              await Filesystem.writeFile({path:path,data:b64,directory:dirs[i],recursive:true});
+              var uriRes=await Filesystem.getUri({path:path,directory:dirs[i]});
+              uri=uriRes&&(uriRes.uri||uriRes);
+            }catch(eD){}
+          }
+          if(uri){
+            try{
+              await Share.share({title:title,text:text,url:uri,dialogTitle:dialogTitle});
+              return true;
+            }catch(e1){
+              try{ await Share.share({title:title,text:text,files:[uri],dialogTitle:dialogTitle}); return true; }catch(e2){}
+            }
+          }
+        }
+      }
+    }catch(eCap){ console.warn("orbit native share", eCap); }
+
+    // Web Share API with file attachment
+    try{
+      if(blob && navigator.share){
+        var mime = blob.type || opts.mime || "application/octet-stream";
+        var file=null;
+        try{ file=new File([blob], filename, {type:mime,lastModified:Date.now()}); }catch(e){}
+        if(file){
+          try{
+            if(!navigator.canShare || navigator.canShare({files:[file]})){
+              await navigator.share({files:[file],title:title,text:text});
+              return true;
+            }
+          }catch(eS){ if(eS && eS.name==="AbortError") return true; }
+          try{ await navigator.share({files:[file],title:title,text:text}); return true; }catch(eS2){ if(eS2 && eS2.name==="AbortError") return true; }
+        }
+      }
+    }catch(eW){}
+
+    // Text-only share fallback
+    try{
+      if(navigator.share){
+        await navigator.share({title:title,text:text});
+        return true;
+      }
+    }catch(eT){ if(eT && eT.name==="AbortError") return true; }
+
     return false;
   };
+
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", ready); else ready();
   window.addEventListener("load", ready);
 })();

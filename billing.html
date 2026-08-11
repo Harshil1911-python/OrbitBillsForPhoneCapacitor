@@ -75,6 +75,36 @@ header.app-bar{background:var(--card);border-bottom:1px solid var(--line);paddin
 .pill.sync{background:var(--tint);color:var(--brand)}.pill.low{background:#fee2e2;color:var(--bad)}
 .pill.paid{background:#dcfce7;color:var(--ok)}.pill.unpaid{background:#fee2e2;color:var(--bad)}.pill.partial{background:#fef3c7;color:var(--warn)}
 .toolbar{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+/* Sale action buttons — usable on mobile */
+#cartPanelSale .toolbar:last-of-type{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin-top:10px;
+  margin-bottom:4px;
+}
+#cartPanelSale .toolbar:last-of-type .btn{
+  min-height:44px;
+  width:100%;
+  font-size:12.5px;
+  font-weight:700;
+  padding:10px 6px;
+  border-radius:11px;
+  white-space:nowrap;
+}
+#cartPanelSale .toolbar:last-of-type #btnQuote{grid-column:span 1}
+@media(max-width:420px){
+  #cartPanelSale .toolbar:last-of-type{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+/* Light native feel */
+html,body{-webkit-tap-highlight-color:transparent}
+.btn,.panel-tab,.nav-item{transition:transform .12s ease,opacity .12s ease}
+.btn:active,.panel-tab:active{transform:scale(.97);opacity:.92}
+.modal-bg{animation:orbitFadeIn .18s ease}
+@keyframes orbitFadeIn{from{opacity:0}to{opacity:1}}
+.modal{animation:orbitSheetUp .22s ease}
+@keyframes orbitSheetUp{from{transform:translateY(12px);opacity:.96}to{transform:none;opacity:1}}
+
 .hint{font-size:11px;color:var(--muted);background:var(--tint);border:1px dashed var(--line);border-radius:8px;padding:8px;margin-top:8px;line-height:1.5}
 .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.48);display:none;align-items:flex-end;justify-content:center;z-index:300;padding:0}
 .modal-bg.open{display:flex}
@@ -1704,6 +1734,25 @@ function blobToBase64(blob){
 
 /** Save file so it can appear in Downloads / Gallery / share targets */
 async function saveBlobToDevice(blob, filename, meta){
+  // Prefer unified native share (WhatsApp / Drive / Gallery via system sheet)
+  try{
+    if(typeof window.__orbitNativeShare === "function" && blob){
+      var sharedN = await window.__orbitNativeShare({
+        blob: blob,
+        filename: filename,
+        title: filename,
+        text: "Invoice from OrbitBills",
+        mime: (blob && blob.type) || (meta && meta.mime) || "application/octet-stream",
+        dialogTitle: "Save or share invoice"
+      });
+      if(sharedN){
+        const item = registerOrbitDownload(blob, filename, meta || {});
+        try{ toast("Pick Gallery, WhatsApp, Drive, or Files"); }catch(e){}
+        return item;
+      }
+    }
+  }catch(ePref){ console.warn(ePref); }
+
   const item = registerOrbitDownload(blob, filename, meta || {});
   const mime = (blob && blob.type) || (meta && meta.mime) || "application/octet-stream";
   // 1) Capacitor Filesystem → Documents / Cache (then share)
@@ -3495,10 +3544,35 @@ async function sendInvoiceWhatsApp(){
     }
   }
 
-  // Always open THIS customer's WhatsApp chat (selected client number)
-  const waUrl = "https://wa.me/" + phone + "?text=" + encodeURIComponent(msgText);
+  // If system share already opened with file, stop — user picks WhatsApp with attachment
+  if (shared) {
+    toast("Share sheet opened — pick WhatsApp, Drive, or Gallery");
+    try { if (window.__orbitHaptic) window.__orbitHaptic("success"); } catch (e) {}
+    return;
+  }
+
+  // Prefer native share helper (attaches PNG/PDF)
+  if (blob && typeof window.__orbitNativeShare === "function") {
+    try {
+      var okNative = await window.__orbitNativeShare({
+        blob: blob,
+        filename: filename,
+        title: "Invoice " + invNo,
+        text: msgText,
+        mime: mime,
+        dialogTitle: "Share invoice"
+      });
+      if (okNative) {
+        toast("Share sheet opened — pick WhatsApp to send with file");
+        try { if (window.__orbitHaptic) window.__orbitHaptic("success"); } catch (e) {}
+        return;
+      }
+    } catch (eN) { console.warn(eN); }
+  }
+
+  // Fallback: open client's WhatsApp chat (text only — attach from Downloads if needed)
+  const waUrl = "https://wa.me/" + phone + "?text=" + encodeURIComponent(msgText + (blob ? "\n\n(Attach the invoice from Downloads if needed)" : ""));
   try {
-    // Prefer location on mobile app/WebView so it hands off to WhatsApp reliably
     const isCap = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
     const isMobile = isCap || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
     if (isMobile) {
@@ -3511,9 +3585,7 @@ async function sendInvoiceWhatsApp(){
     window.location.href = waUrl;
   }
 
-  toast(shared
-    ? ("Opening WhatsApp chat for " + phone + " — attach file if needed")
-    : ("Opening WhatsApp for " + phone + (blob ? " · invoice saved in Downloads" : "")));
+  toast("Opening WhatsApp for " + phone + (blob ? " · invoice in Downloads — attach if needed" : ""));
   try { if (window.__orbitHaptic) window.__orbitHaptic("success"); } catch (e) {}
 }
 document.getElementById("btnWhatsApp")?.addEventListener("click", () => { sendInvoiceWhatsApp(); });

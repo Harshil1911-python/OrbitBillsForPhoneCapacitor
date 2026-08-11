@@ -205,13 +205,13 @@
 <body>
 
   <div id="corpSplash" aria-hidden="false">
-    <img src="ts-element-512.png" alt="TechSerenia" onerror="this.src='app-icon-512.png';this.onerror=function(){this.src='logo.png'}">
+    <img src="ts-element-512.png" decoding="async" fetchpriority="high" alt="TechSerenia" onerror="this.src='app-icon-512.png';this.onerror=function(){this.src='logo.png'}">
     <div class="splash-name">TechSerenia</div>
   </div>
 
   <div id="appShell">
     <header class="top">
-      <img src="logo.png" alt="OrbitBills" onerror="this.src='ts-element-512.png';this.onerror=function(){this.style.display='none'}">
+      <img src="logo.png" decoding="async" fetchpriority="high" alt="OrbitBills" onerror="this.src='ts-element-512.png';this.onerror=function(){this.style.display='none'}">
       <div class="top-actions">
         <a class="btn btn-ghost" href="signin.html">Sign in</a>
         <button class="hamburger" id="menuBtn" type="button" aria-label="Open menu">&#9776;</button>
@@ -307,8 +307,8 @@
           if(splash && splash.parentNode) splash.parentNode.removeChild(splash);
         }, 500);
       }
-      setTimeout(finish, 1400);
-      window.addEventListener('load', function(){ setTimeout(finish, 400); });
+      setTimeout(finish, 900);
+      window.addEventListener('load', function(){ setTimeout(finish, 200); });
 
       var d = document.getElementById('drawer');
       var s = document.getElementById('scrim');

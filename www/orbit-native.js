@@ -16,7 +16,6 @@
       return p==="capacitor:"||p==="ionic:"||h==="localhost"||h==="127.0.0.1";
     }catch(e){ return false; }
   }
-
   async function tryHybridLiveRedirect(){
     if(!hasCap()||!PREFER_LIVE||isOnLiveHost()) return false;
     if(!isLocalCapOrigin() && location.protocol!=="file:") return false;
@@ -43,90 +42,65 @@
       }
     }catch(e){}
     try{
-      var Nav=plugin("NavigationBar")||plugin("EdgeToEdge")||plugin("AndroidNavigationBar");
-      if(Nav){
-        if(Nav.setColor) await Nav.setColor({color:brand,darkButtons:true});
-        else if(Nav.setBackgroundColor) await Nav.setBackgroundColor({color:brand});
-      }
-    }catch(e){}
-    try{
       var meta=document.querySelector('meta[name="theme-color"]');
       if(meta) meta.setAttribute("content",brand);
       else{ meta=document.createElement("meta"); meta.name="theme-color"; meta.content=brand; document.head.appendChild(meta); }
-      ensureNavFill(brand);
     }catch(e){}
-  }
-  function ensureNavFill(brand){
-    if(document.getElementById("orbitNavFill")) return;
-    var fill=document.createElement("div");
-    fill.id="orbitNavFill"; fill.setAttribute("aria-hidden","true");
-    fill.style.cssText="position:fixed;left:0;right:0;bottom:0;height:env(safe-area-inset-bottom,0px);min-height:0;background:"+(brand||"#ffffff")+";z-index:99998;pointer-events:none;";
-    (document.body||document.documentElement).appendChild(fill);
   }
 
   function ensureOfflineModal(){
     if(document.getElementById("orbitOfflineModal")) return;
     var wrap=document.createElement("div");
-    wrap.id="orbitOfflineModal"; wrap.setAttribute("aria-hidden","true");
+    wrap.id="orbitOfflineModal";
     wrap.style.cssText="display:none;position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.45);align-items:center;justify-content:center;padding:20px;box-sizing:border-box;";
-    wrap.innerHTML='<div role="dialog" style="width:100%;max-width:340px;background:#fff;border-radius:16px;padding:22px 18px 16px;box-shadow:0 20px 50px rgba(15,23,42,.25);font-family:system-ui,sans-serif;">'
-      +'<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#101a2b;">You are offline</h3>'
-      +'<p style="margin:0 0 14px;font-size:14px;line-height:1.45;color:#5b6b82;">Data stays on this device. You can keep billing as usual.</p>'
-      +'<div id="orbitOffLearn" style="display:none;margin:0 0 14px;padding:12px;border-radius:12px;background:#f5f8fe;border:1px solid #dfe7f5;font-size:13.5px;line-height:1.45;">'
-      +'<strong style="display:block;margin-bottom:4px;">Latest features may not work in offline mode</strong>'
-      +'When offline the app uses pages stored inside it. Updates appear next time you open online.</div>'
-      +'<button type="button" id="orbitOffLearnBtn" style="width:100%;margin-bottom:8px;min-height:44px;border:1px solid #dfe7f5;background:#fff;color:#0b3d91;font-weight:700;font-size:14px;border-radius:11px;">Learn more</button>'
-      +'<button type="button" id="orbitOffOk" style="width:100%;min-height:44px;border:0;background:#0b3d91;color:#fff;font-weight:700;font-size:14px;border-radius:11px;">OK</button></div>';
+    wrap.innerHTML='<div style="width:100%;max-width:340px;background:#fff;border-radius:16px;padding:22px 18px 16px;font-family:system-ui,sans-serif;">'
+      +'<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;">You are offline</h3>'
+      +'<p style="margin:0 0 14px;font-size:14px;color:#5b6b82;line-height:1.45;">Data stays on this device.</p>'
+      +'<div id="orbitOffLearn" style="display:none;margin:0 0 14px;padding:12px;border-radius:12px;background:#f5f8fe;font-size:13.5px;line-height:1.45;"><strong>Latest features may not work in offline mode</strong><br>Updates appear next time you open online.</div>'
+      +'<button type="button" id="orbitOffLearnBtn" style="width:100%;margin-bottom:8px;min-height:44px;border:1px solid #dfe7f5;background:#fff;color:#0b3d91;font-weight:700;border-radius:11px;">Learn more</button>'
+      +'<button type="button" id="orbitOffOk" style="width:100%;min-height:44px;border:0;background:#0b3d91;color:#fff;font-weight:700;border-radius:11px;">OK</button></div>';
     (document.body||document.documentElement).appendChild(wrap);
-    wrap.addEventListener("click",function(e){ if(e.target===wrap) hideOfflineModal(); });
-    var learnBtn=document.getElementById("orbitOffLearnBtn"), learnBox=document.getElementById("orbitOffLearn");
-    if(learnBtn&&learnBox) learnBtn.addEventListener("click",function(){
-      var open=learnBox.style.display==="block"; learnBox.style.display=open?"none":"block"; learnBtn.textContent=open?"Learn more":"Hide details";
-    });
-    var ok=document.getElementById("orbitOffOk"); if(ok) ok.addEventListener("click",hideOfflineModal);
+    document.getElementById("orbitOffLearnBtn").onclick=function(){
+      var b=document.getElementById("orbitOffLearn"); var open=b.style.display==="block";
+      b.style.display=open?"none":"block"; this.textContent=open?"Learn more":"Hide details";
+    };
+    document.getElementById("orbitOffOk").onclick=function(){ wrap.style.display="none"; try{ sessionStorage.setItem("orbit_offline_modal_dismissed","1"); }catch(e){} };
   }
   function showOfflineModal(){
     try{ if(sessionStorage.getItem("orbit_offline_modal_dismissed")==="1") return; }catch(e){}
-    ensureOfflineModal();
-    var wrap=document.getElementById("orbitOfflineModal");
-    if(wrap){ wrap.style.display="flex"; wrap.setAttribute("aria-hidden","false"); }
-  }
-  function hideOfflineModal(){
-    var wrap=document.getElementById("orbitOfflineModal");
-    if(wrap){ wrap.style.display="none"; wrap.setAttribute("aria-hidden","true"); }
-    try{ sessionStorage.setItem("orbit_offline_modal_dismissed","1"); }catch(e){}
+    ensureOfflineModal(); document.getElementById("orbitOfflineModal").style.display="flex";
   }
 
   async function ready(){
     try{ if(await tryHybridLiveRedirect()) return true; }catch(e){}
-    if(!hasCap()){ setupNetwork(); setupBackButton(); try{ ensureNavFill("#ffffff"); }catch(e){} return false; }
+    if(!hasCap()){ setupNetwork(); setupBackButton(); return false; }
     await setChromeColors();
-    try{ var Splash=plugin("SplashScreen"); if(Splash&&Splash.hide) await Splash.hide({fadeOutDuration:250}); }catch(e){}
+    try{ var Splash=plugin("SplashScreen"); if(Splash&&Splash.hide) await Splash.hide({fadeOutDuration:150}); }catch(e){}
     try{ var Keyboard=plugin("Keyboard"); if(Keyboard&&Keyboard.setResizeMode) await Keyboard.setResizeMode({mode:"body"}); }catch(e){}
     setupNetwork(); setupBackButton();
-    try{ if(/billing\.html/i.test(location.pathname||"")&&navigator.wakeLock&&navigator.wakeLock.request){ try{ window.__orbitWake=await navigator.wakeLock.request("screen"); }catch(e){} } }catch(e){}
     return true;
   }
   function setupNetwork(){
     var Network=plugin("Network");
-    var bar=document.getElementById("orbitOfflineBanner");
-    if(!bar){
-      bar=document.createElement("div"); bar.id="orbitOfflineBanner";
-      bar.style.cssText="display:none;position:fixed;left:0;right:0;top:0;z-index:99999;background:#b91c1c;color:#fff;font:600 13px/1.3 system-ui,sans-serif;padding:8px 40px 8px 12px;padding-top:max(8px,env(safe-area-inset-top));text-align:center;box-sizing:border-box;";
-      var msg=document.createElement("span"); msg.id="orbitOfflineBannerText"; msg.textContent="You are offline — data stays on this device"; bar.appendChild(msg);
-      var x=document.createElement("button"); x.type="button"; x.textContent="×";
-      x.style.cssText="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:0;background:transparent;color:#fff;font:700 22px/1 system-ui,sans-serif;";
-      x.addEventListener("click",function(){ try{ sessionStorage.setItem("orbit_offline_banner_dismissed","1"); }catch(e){} bar.style.display="none"; bar.setAttribute("data-dismissed","1"); });
-      bar.appendChild(x); (document.body||document.documentElement).appendChild(bar);
-    }
-    function isDismissed(){ if(bar.getAttribute("data-dismissed")==="1") return true; try{ return sessionStorage.getItem("orbit_offline_banner_dismissed")==="1"; }catch(e){ return false; } }
     function setOnline(ok){
-      if(ok){ bar.style.display="none"; try{ sessionStorage.removeItem("orbit_offline_banner_dismissed"); }catch(e){} bar.removeAttribute("data-dismissed");
-        try{ if(hasCap()&&PREFER_LIVE&&!isOnLiveHost()&&(isLocalCapOrigin()||location.protocol==="file:")&&sessionStorage.getItem("orbit_live_redirected")!=="1") tryHybridLiveRedirect(); }catch(e){} return; }
-      if(!isDismissed()) bar.style.display="block"; try{ showOfflineModal(); }catch(e){}
+      var bar=document.getElementById("orbitOfflineBanner");
+      if(!bar){
+        bar=document.createElement("div"); bar.id="orbitOfflineBanner";
+        bar.style.cssText="display:none;position:fixed;left:0;right:0;top:0;z-index:99999;background:#b91c1c;color:#fff;font:600 13px/1.3 system-ui,sans-serif;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top));text-align:center;";
+        bar.textContent="You are offline — data stays on this device";
+        (document.body||document.documentElement).appendChild(bar);
+      }
+      if(ok){ bar.style.display="none"; return; }
+      bar.style.display="block"; try{ showOfflineModal(); }catch(e){}
     }
-    if(Network&&Network.getStatus){ Network.getStatus().then(function(s){ setOnline(!!s.connected); }).catch(function(){}); if(Network.addListener) Network.addListener("networkStatusChange",function(s){ setOnline(!!s.connected); }); }
-    else{ setOnline(navigator.onLine); window.addEventListener("online",function(){ setOnline(true); }); window.addEventListener("offline",function(){ setOnline(false); }); }
+    if(Network&&Network.getStatus){
+      Network.getStatus().then(function(s){ setOnline(!!s.connected); }).catch(function(){});
+      if(Network.addListener) Network.addListener("networkStatusChange", function(s){ setOnline(!!s.connected); });
+    } else {
+      setOnline(navigator.onLine);
+      window.addEventListener("online", function(){ setOnline(true); });
+      window.addEventListener("offline", function(){ setOnline(false); });
+    }
   }
   function setupBackButton(){
     var App=plugin("App");
@@ -134,75 +108,111 @@
       if(document.body&&document.body.classList.contains("m-cart-open")){ if(window.__orbitCloseMobileCart) window.__orbitCloseMobileCart(); else document.body.classList.remove("m-cart-open"); return true; }
       var menu=document.getElementById("mobileMenu");
       if(menu&&menu.classList.contains("open")){ if(window.__orbitCloseMobileMenu) window.__orbitCloseMobileMenu(); else menu.classList.remove("open"); return true; }
-      var openModal=document.querySelector(".modal-bg.open"); if(openModal){ openModal.classList.remove("open"); return true; }
-      var offModal=document.getElementById("orbitOfflineModal"); if(offModal&&offModal.style.display==="flex"){ hideOfflineModal(); return true; }
+      var openModal=document.querySelector(".modal-bg.open, .modal-backdrop.open");
+      if(openModal){ openModal.classList.remove("open"); return true; }
       if(window.history.length>1){ history.back(); return true; }
       return false;
     };
-    if(App&&App.addListener) App.addListener("backButton",function(){ var handled=false; try{ handled=!!window.__orbitAndroidBack(); }catch(e){} if(!handled&&App.exitApp) App.exitApp(); });
+    if(App&&App.addListener) App.addListener("backButton", function(){ var h=false; try{ h=!!window.__orbitAndroidBack(); }catch(e){} if(!h&&App.exitApp) App.exitApp(); });
   }
   window.__orbitHaptic=async function(style){
     try{
-      if(!hasCap()){ if(navigator.vibrate) navigator.vibrate(style==="error"?30:12); return; }
+      if(!hasCap()){ if(navigator.vibrate) navigator.vibrate(style==="error"?40:18); return; }
       var H=plugin("Haptics"); if(!H) return;
       if(style==="success"&&H.notification) await H.notification({type:"SUCCESS"});
-      else if(style==="error"&&H.notification) await H.notification({type:"ERROR"});
-      else if(H.impact) await H.impact({style:"LIGHT"});
+      else if(H.impact) await H.impact({style:"MEDIUM"});
     }catch(e){}
   };
 
-  /** Share blob with Android system sheet — attaches file for WhatsApp / Drive / Gallery */
+  function blobToB64(blob){
+    return new Promise(function(resolve,reject){
+      var r=new FileReader();
+      r.onload=function(){ var s=String(r.result||""); var i=s.indexOf(","); resolve(i>=0?s.slice(i+1):s); };
+      r.onerror=reject; r.readAsDataURL(blob);
+    });
+  }
+
+  /** Share or save any file — works on Capacitor APK and mobile browser */
   window.__orbitNativeShare=async function(opts){
     opts=opts||{};
-    var title=opts.title||"OrbitBills", text=opts.text||"", filename=opts.filename||"file.bin", blob=opts.blob||null, dialogTitle=opts.dialogTitle||"Share";
+    var blob=opts.blob, filename=opts.filename||"file.bin", title=opts.title||"OrbitBills";
+    var text=opts.text||"", mime=opts.mime||(blob&&blob.type)||"application/octet-stream";
+    var dialogTitle=opts.dialogTitle||"Share";
     if(!blob) return false;
 
-    // A) Capacitor Share + Filesystem (best for APK)
+    // 1) Capacitor Share with file URI
     try{
       if(hasCap()){
-        var Share=plugin("Share"), Filesystem=plugin("Filesystem");
-        if(Share&&Share.share&&Filesystem&&Filesystem.writeFile){
-          var b64=await new Promise(function(resolve,reject){
-            var r=new FileReader();
-            r.onload=function(){ var s=String(r.result||""); var i=s.indexOf(","); resolve(i>=0?s.slice(i+1):s); };
-            r.onerror=reject; r.readAsDataURL(blob);
-          });
+        var Share=plugin("Share"), FS=plugin("Filesystem");
+        if(Share&&Share.share&&FS&&FS.writeFile){
+          var b64=await blobToB64(blob);
           var path="OrbitBills/"+filename;
           var dirs=["CACHE","DATA","DOCUMENTS","EXTERNAL"];
           var uri=null;
           for(var i=0;i<dirs.length&&!uri;i++){
             try{
-              await Filesystem.writeFile({path:path,data:b64,directory:dirs[i],recursive:true});
-              var uriRes=await Filesystem.getUri({path:path,directory:dirs[i]});
-              uri=uriRes&&(uriRes.uri||uriRes);
-            }catch(eD){}
+              await FS.writeFile({path:path,data:b64,directory:dirs[i],recursive:true});
+              var res=await FS.getUri({path:path,directory:dirs[i]});
+              uri=res&&(res.uri||res);
+            }catch(e){}
           }
           if(uri){
-            try{ await Share.share({title:title,text:text,url:uri,dialogTitle:dialogTitle}); return true; }
-            catch(e1){ try{ await Share.share({title:title,text:text,files:[uri],dialogTitle:dialogTitle}); return true; }catch(e2){} }
+            try{ await Share.share({title:title,text:text,url:String(uri),dialogTitle:dialogTitle}); return true; }catch(e1){}
+            try{ await Share.share({title:title,text:text,files:[String(uri)],dialogTitle:dialogTitle}); return true; }catch(e2){}
           }
         }
       }
-    }catch(eCap){ console.warn("native share cap", eCap); }
+    }catch(e){ console.warn("cap share", e); }
 
-    // B) Web Share API with File (Chrome Android / WebView)
+    // 2) Web Share Level 2 (files)
     try{
-      var mime=blob.type||opts.mime||"application/octet-stream";
-      var file=null; try{ file=new File([blob],filename,{type:mime,lastModified:Date.now()}); }catch(e){}
+      var file=null;
+      try{ file=new File([blob],filename,{type:mime,lastModified:Date.now()}); }catch(e){}
       if(file&&navigator.share){
         try{
           if(!navigator.canShare||navigator.canShare({files:[file]})){
             await navigator.share({files:[file],title:title,text:text}); return true;
           }
         }catch(eS){ if(eS&&eS.name==="AbortError") return true; }
-        try{ await navigator.share({files:[file],title:title,text:text}); return true; }
-        catch(eS2){ if(eS2&&eS2.name==="AbortError") return true; }
       }
-    }catch(eW){}
+    }catch(e){}
 
-    // C) text-only
-    try{ if(navigator.share){ await navigator.share({title:title,text:text}); return true; } }catch(eT){ if(eT&&eT.name==="AbortError") return true; }
+    // 3) Force download via anchor (works more often with blob URL)
+    try{
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement("a");
+      a.href=url; a.download=filename; a.style.display="none";
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ try{ document.body.removeChild(a); URL.revokeObjectURL(url); }catch(e){} }, 4000);
+      return true;
+    }catch(e){}
+
     return false;
+  };
+
+  /** Explicit save/download helper */
+  window.__orbitNativeDownload=async function(blob, filename){
+    if(!blob) return false;
+    filename=filename||"download.bin";
+    // Cap write to documents
+    try{
+      if(hasCap()){
+        var FS=plugin("Filesystem");
+        if(FS&&FS.writeFile){
+          var b64=await blobToB64(blob);
+          var path="OrbitBills/"+filename;
+          var dirs=["DOCUMENTS","DATA","CACHE","EXTERNAL"];
+          for(var i=0;i<dirs.length;i++){
+            try{
+              await FS.writeFile({path:path,data:b64,directory:dirs[i],recursive:true});
+              // then share so user can Save to Files / Gallery
+              return await window.__orbitNativeShare({blob:blob,filename:filename,title:filename,text:"Saved from OrbitBills",dialogTitle:"Save file"});
+            }catch(e){}
+          }
+        }
+      }
+    }catch(e){}
+    return await window.__orbitNativeShare({blob:blob,filename:filename,title:filename,dialogTitle:"Save file"});
   };
 
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", ready); else ready();

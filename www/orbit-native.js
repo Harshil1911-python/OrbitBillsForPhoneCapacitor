@@ -5,14 +5,14 @@
   function plugin(n){ try{ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[n]; }catch(e){ return null; } }
 
   // Live site used when phone is online (hybrid mode). Keep in sync with app-config.json websiteUrl.
-  var LIVE_URL = "https://orbitbillsdemo2.onrender.com";
+  var LIVE_URL = "https://orbitbillsphone.onrender.com";
   var PREFER_LIVE = true;
 
   function isOnLiveHost(){
     try{
       var h = (location.hostname||"").toLowerCase();
       if(!h) return false;
-      return h.indexOf("onrender.com") >= 0 || h === "orbitbillsdemo2.onrender.com";
+      return h.indexOf("onrender.com") >= 0 || h === "orbitbillsphone.onrender.com";
     }catch(e){ return false; }
   }
   function isLocalCapOrigin(){

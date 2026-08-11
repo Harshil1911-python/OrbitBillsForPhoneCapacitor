@@ -3,320 +3,149 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
-<meta name="theme-color" content="#0c4a6e">
+<meta name="theme-color" content="#000000">
 <title>OrbitBills · TechSerenia</title>
 <link rel="icon" href="favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --brand:#0c4a6e;
-    --brand2:#0369a1;
-    --accent:#0e7490;
-    --bg:#f0f9ff;
-    --ink:#0f172a;
-    --slate:#475569;
-    --line:#bae6fd;
-    --white:#ffffff;
-    --card:#ffffff;
-  }
+  :root{--blue:#0b3d91;--blue2:#1d4ed8;--bg:#f5f8fe;--ink:#101a2b;--slate:#5b6b82;--line:#dfe7f5}
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{
-    font-family:Inter,system-ui,-apple-system,sans-serif;
-    color:var(--ink);
-    background:var(--bg);
-    line-height:1.5;
-    -webkit-user-select:none;user-select:none;
-    -webkit-touch-callout:none;
-    -webkit-tap-highlight-color:transparent;
-    overflow-x:hidden;
-  }
-  h1,h2,h3{font-family:"Space Grotesk",system-ui,sans-serif;letter-spacing:-0.02em;font-weight:700}
+  body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg);line-height:1.5;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  h1,h2,h3{font-family:"Space Grotesk",system-ui,sans-serif;letter-spacing:-0.02em}
   a{text-decoration:none;color:inherit}
-  input,textarea,select{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
-
-  /* ========== LOGO SPLASH ========== */
-  #corpSplash{
-    position:fixed;inset:0;z-index:99999;
-    background:linear-gradient(165deg,#0c4a6e 0%,#082f49 55%,#0e7490 100%);
-    display:flex;align-items:center;justify-content:center;flex-direction:column;
-    transition:opacity .45s ease, visibility .45s ease;
-  }
-  #corpSplash.hide{
-    opacity:0;visibility:hidden;pointer-events:none;
-  }
-  #corpSplash img{
-    width:min(160px,42vw);
-    height:auto;
-    object-fit:contain;
-    opacity:0;
-    transform:scale(0.92);
-    animation:logoIn .7s ease .15s forwards;
-  }
-  #corpSplash .splash-name{
-    margin-top:18px;
-    font-family:"Space Grotesk",system-ui,sans-serif;
-    font-size:13px;
-    font-weight:600;
-    letter-spacing:.14em;
-    text-transform:uppercase;
-    color:rgba(255,255,255,.8);
-    opacity:0;
-    animation:logoIn .6s ease .4s forwards;
-  }
-  @keyframes logoIn{
-    to{opacity:1;transform:scale(1)}
-  }
-
-  #appShell{opacity:0;transition:opacity .4s ease}
-  #appShell.show{opacity:1}
-
   .top{
-    position:sticky;top:0;z-index:30;
-    background:rgba(255,255,255,.96);
+    position:sticky;top:0;z-index:30;background:rgba(255,255,255,.97);
     border-bottom:1px solid var(--line);
-    padding:10px 16px;
-    padding-top:max(10px,env(safe-area-inset-top));
+    padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));
     display:flex;align-items:center;justify-content:space-between;gap:10px;
   }
-  .top img{height:30px;width:auto;display:block}
+  .top img{height:32px;width:auto;display:block}
   .top-actions{display:flex;gap:8px;align-items:center}
   .hamburger{
-    width:40px;height:40px;border-radius:10px;border:1px solid var(--line);
-    background:var(--white);font-size:18px;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;color:var(--ink);
+    width:42px;height:42px;border-radius:11px;border:1px solid var(--line);
+    background:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;
   }
   .btn{
     display:inline-flex;align-items:center;justify-content:center;
-    padding:10px 16px;border-radius:10px;font-weight:600;font-size:13.5px;
-    border:1px solid transparent;min-height:40px;font-family:inherit;
+    padding:10px 14px;border-radius:11px;font-weight:700;font-size:13.5px;
+    border:1px solid transparent;min-height:42px;
   }
-  .btn-primary{background:var(--brand);color:#fff}
-  .btn-primary:active{background:#082f49}
-  .btn-ghost{background:var(--white);color:var(--brand);border-color:var(--line)}
-  .btn-ghost:active{background:#e0f2fe}
-
-  .scrim{display:none;position:fixed;inset:0;background:rgba(8,47,73,.45);z-index:40}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-ghost{background:#fff;color:var(--blue);border-color:var(--line)}
+  .scrim{display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:40}
   .scrim.open{display:block}
   .drawer{
     position:fixed;top:0;right:0;bottom:0;width:min(300px,86vw);background:#fff;z-index:50;
     transform:translateX(100%);transition:transform .22s ease;padding:16px;
-    padding-top:max(16px,env(safe-area-inset-top));
-    box-shadow:-8px 0 28px rgba(8,47,73,.14);
-    display:flex;flex-direction:column;gap:4px;
+    padding-top:max(16px,env(safe-area-inset-top));box-shadow:-8px 0 28px rgba(15,23,42,.12);
+    display:flex;flex-direction:column;gap:6px;
   }
   .drawer.open{transform:translateX(0)}
-  .drawer h3{
-    font-size:12px;color:var(--slate);text-transform:uppercase;
-    letter-spacing:.08em;margin:10px 4px 8px;font-weight:600;font-family:Inter,sans-serif;
-  }
+  .drawer h3{font-size:13px;color:var(--slate);text-transform:uppercase;letter-spacing:.06em;margin:8px 4px 10px}
   .drawer a{
-    display:block;padding:13px 12px;border-radius:10px;font-weight:600;font-size:15px;color:var(--ink);
+    display:block;padding:14px 12px;border-radius:12px;font-weight:600;font-size:15px;color:var(--ink);
   }
-  .drawer a:active{background:#e0f2fe}
+  .drawer a:active,.drawer a:hover{background:var(--bg)}
   .drawer .close{
-    align-self:flex-end;width:40px;height:40px;border:1px solid var(--line);
-    border-radius:10px;background:#fff;font-size:18px;cursor:pointer;
+    align-self:flex-end;width:40px;height:40px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:18px;cursor:pointer
   }
-
   .hero{
-    background:linear-gradient(160deg,#0c4a6e 0%,#0369a1 48%,#0e7490 100%);
-    color:#fff;
-    padding:48px 20px 40px;
-    position:relative;
-    overflow:hidden;
+    padding:48px 20px 40px;color:#fff;position:relative;overflow:hidden;
+    background:#000 url('ts-element-512.png') center 38%/min(300px,68vw) no-repeat;
   }
-  .hero::after{
-    content:"";
-    position:absolute;right:-20px;bottom:-30px;
-    width:min(220px,55vw);height:min(220px,55vw);
-    background:url('ts-element-512.png') center/contain no-repeat;
-    opacity:.14;
-    pointer-events:none;
+  .hero::before{
+    content:"";position:absolute;inset:0;
+    background:radial-gradient(ellipse at center, rgba(0,0,0,.35) 0%, rgba(0,0,0,.82) 55%, #000 100%);
   }
-  .hero-inner{position:relative;z-index:1;max-width:560px;margin:0 auto}
-  .hero-kicker{
-    font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
-    color:rgba(255,255,255,.7);margin-bottom:12px;
-  }
-  .hero h1{
-    font-size:clamp(24px,6vw,32px);line-height:1.2;margin-bottom:12px;
-    max-width:16ch;
-  }
-  .hero p{
-    font-size:15px;color:rgba(255,255,255,.88);max-width:36ch;margin-bottom:24px;
-  }
+  .hero-inner{position:relative;z-index:1}
+  .hero-inner{max-width:560px;margin:0 auto}
+  .hero h1{font-size:clamp(26px,6.5vw,34px);line-height:1.18;margin-bottom:12px}
+  .hero p{font-size:15.5px;opacity:.93;max-width:38ch;margin-bottom:22px}
   .hero-cta{display:flex;flex-wrap:wrap;gap:10px}
-  .hero .btn-primary{background:#fff;color:var(--brand)}
+  .hero .btn-primary{background:#fff;color:var(--blue)}
   .hero .btn-ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
-
   .section{padding:28px 18px;max-width:600px;margin:0 auto}
-  .section h2{font-size:18px;margin-bottom:6px;color:var(--brand)}
-  .lead{color:var(--slate);font-size:14px;margin-bottom:16px}
-
-  .grid{display:grid;gap:10px}
+  .section h2{font-size:20px;margin-bottom:8px}
+  .lead{color:var(--slate);font-size:14.5px;margin-bottom:16px}
+  .grid{display:grid;gap:12px}
   @media(min-width:560px){.grid.cols-3{grid-template-columns:repeat(3,1fr)}}
-
-  .card{
-    background:var(--card);
-    border:1px solid var(--line);
-    border-radius:12px;
-    padding:16px;
-  }
-  .card h3{font-size:14.5px;margin-bottom:6px;color:var(--brand)}
-  .card p{font-size:13px;color:var(--slate);line-height:1.45}
-
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 16px}
+  .card h3{font-size:15.5px;margin-bottom:6px}
+  .card p{font-size:13.5px;color:var(--slate)}
   .panels{display:grid;gap:10px}
-  .panel-link{
-    display:flex;align-items:center;gap:14px;
-    padding:14px 14px;border-radius:12px;
-    background:var(--white);border:1px solid var(--line);
-  }
-  .panel-link:active{background:#e0f2fe}
-  .panel-link .mark{
-    width:40px;height:40px;border-radius:10px;
-    display:flex;align-items:center;justify-content:center;
-    font-weight:700;color:#fff;flex-shrink:0;
-    font-family:"Space Grotesk",sans-serif;font-size:15px;
-  }
-  .panel-link strong{display:block;font-size:14.5px}
+  .panel-link{display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;background:#fff;border:1px solid var(--line)}
+  .panel-link .mark{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;flex-shrink:0;font-family:"Space Grotesk",sans-serif}
+  .panel-link strong{display:block;font-size:15px}
   .panel-link span{font-size:12.5px;color:var(--slate)}
-  .panel-link .go{margin-left:auto;color:var(--brand);font-weight:700;font-size:18px}
-
-  .footer{
-    text-align:center;
-    padding:24px 16px max(28px,env(safe-area-inset-bottom));
-    color:var(--slate);font-size:12px;
-    border-top:1px solid var(--line);margin-top:8px;
-    background:#e0f2fe;
-  }
-  .footer a{color:var(--brand);font-weight:600}
-
-  .anim-rise{animation:orbitRise .45s ease both}
-  .anim-rise.d1{animation-delay:.05s}
-  .anim-rise.d2{animation-delay:.12s}
-  .anim-rise.d3{animation-delay:.2s}
-  .anim-rise.d4{animation-delay:.28s}
-  @keyframes orbitRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-  .btn,.panel-link{transition:transform .12s ease,opacity .12s ease}
-  .btn:active,.panel-link:active{transform:scale(.98);opacity:.92}
+  .panel-link .go{margin-left:auto;color:var(--blue);font-weight:700;font-size:18px}
+  .footer{text-align:center;padding:24px 16px max(28px,env(safe-area-inset-bottom));color:var(--slate);font-size:12.5px;border-top:1px solid var(--line);margin-top:8px}
+  .footer a{color:var(--blue);font-weight:600}
+  input,textarea,select{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
 </style>
 </head>
 <body>
+  <header class="top">
+    <img src="logo.png" alt="OrbitBills" onerror="this.style.display='none'">
+    <div class="top-actions">
+      <a class="btn btn-ghost" href="signin.html">Sign in</a>
+      <button class="hamburger" id="menuBtn" aria-label="Open menu">&#9776;</button>
+    </div>
+  </header>
 
-  <div id="corpSplash" aria-hidden="false">
-    <img src="ts-element-512.png" decoding="async" fetchpriority="high" alt="TechSerenia" onerror="this.src='app-icon-512.png';this.onerror=function(){this.src='logo.png'}">
-    <div class="splash-name">TechSerenia</div>
-  </div>
+  <div class="scrim" id="scrim"></div>
+  <nav class="drawer" id="drawer" aria-label="Site menu">
+    <button class="close" id="menuClose" type="button" aria-label="Close">&#10005;</button>
+    <h3>Menu</h3>
+    <a href="aboutus.html">About us</a>
+    <a href="contact.html">Contact</a>
+    <a href="privacy-policy.html">Privacy policy</a>
+    <a href="terms-of-use.html">Terms of use</a>
+    <a href="signin.html">Sign in</a>
+  </nav>
 
-  <div id="appShell">
-    <header class="top">
-      <img src="logo.png" decoding="async" fetchpriority="high" alt="OrbitBills" onerror="this.src='ts-element-512.png';this.onerror=function(){this.style.display='none'}">
-      <div class="top-actions">
-        <a class="btn btn-ghost" href="signin.html">Sign in</a>
-        <button class="hamburger" id="menuBtn" type="button" aria-label="Open menu">&#9776;</button>
+  <section class="hero">
+    <div class="hero-inner">
+      <h1>Billing software for everyday business</h1>
+      <p>Create invoices, manage products, and keep track of payments — from your phone or computer.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="signin.html">Sign in</a>
+        <a class="btn btn-ghost" href="aboutus.html">About TechSerenia</a>
       </div>
-    </header>
+    </div>
+  </section>
 
-    <div class="scrim" id="scrim"></div>
-    <nav class="drawer" id="drawer" aria-label="Site menu">
-      <button class="close" id="menuClose" type="button" aria-label="Close">&#10005;</button>
-      <h3>Menu</h3>
-      <a href="aboutus.html">About us</a>
-      <a href="contact.html">Contact</a>
-      <a href="privacy-policy.html">Privacy policy</a>
-      <a href="terms-of-use.html">Terms of use</a>
-      <a href="signin.html">Sign in</a>
-    </nav>
+  <section class="section">
+    <h2>What you can do</h2>
+    <p class="lead">Practical tools for shops, counters, and small teams.</p>
+    <div class="grid cols-3">
+      <div class="card"><h3>Sales and invoices</h3><p>Raise bills, apply tax, and share invoices with customers.</p></div>
+      <div class="card"><h3>Products and stock</h3><p>Keep your catalogue and stock levels organised in one place.</p></div>
+      <div class="card"><h3>Accounts support</h3><p>Review sales summaries and GST-oriented reports when needed.</p></div>
+    </div>
+  </section>
 
-    <section class="hero">
-      <div class="hero-inner anim-rise d1">
-        <div class="hero-kicker">OrbitBills by TechSerenia</div>
-        <h1>Billing software for everyday business</h1>
-        <p>Create invoices, manage products, and keep track of payments — from your phone or computer.</p>
-        <div class="hero-cta">
-          <a class="btn btn-primary" href="signin.html">Sign in</a>
-          <a class="btn btn-ghost" href="aboutus.html">About TechSerenia</a>
-        </div>
-      </div>
-    </section>
+  <section class="section">
+    <h2>Workspaces</h2>
+    <p class="lead">After you sign in, you can move between these areas from the app menu.</p>
+    <div class="panels">
+      <a class="panel-link" href="billing.html"><div class="mark" style="background:#0b3d91">B</div><div><strong>Billing</strong><span>Point of sale and invoices</span></div><div class="go">›</div></a>
+      <a class="panel-link" href="admin-dashboard.html"><div class="mark" style="background:#2f6feb">A</div><div><strong>Admin</strong><span>Products, clients, branding, backup</span></div><div class="go">›</div></a>
+      <a class="panel-link" href="accountant-dashboard.html"><div class="mark" style="background:#158a53">G</div><div><strong>Accountant</strong><span>GST summaries and exports</span></div><div class="go">›</div></a>
+    </div>
+  </section>
 
-    <section class="section anim-rise d2">
-      <h2>What you can do</h2>
-      <p class="lead">Practical tools for shops, counters, and small teams.</p>
-      <div class="grid cols-3">
-        <div class="card">
-          <h3>Sales and invoices</h3>
-          <p>Raise bills, apply tax, and share invoices with customers.</p>
-        </div>
-        <div class="card">
-          <h3>Products and stock</h3>
-          <p>Keep your catalogue and stock levels organised in one place.</p>
-        </div>
-        <div class="card">
-          <h3>Accounts support</h3>
-          <p>Review sales summaries and GST-oriented reports when needed.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="section anim-rise d3">
-      <h2>Workspaces</h2>
-      <p class="lead">After you sign in, you can move between these areas from the app menu.</p>
-      <div class="panels">
-        <a class="panel-link" href="billing.html">
-          <div class="mark" style="background:#0c4a6e">B</div>
-          <div><strong>Billing</strong><span>Point of sale and invoices</span></div>
-          <div class="go">›</div>
-        </a>
-        <a class="panel-link" href="admin-dashboard.html">
-          <div class="mark" style="background:#0369a1">A</div>
-          <div><strong>Admin</strong><span>Products, clients, branding, backup</span></div>
-          <div class="go">›</div>
-        </a>
-        <a class="panel-link" href="accountant-dashboard.html">
-          <div class="mark" style="background:#0e7490">G</div>
-          <div><strong>Accountant</strong><span>GST summaries and exports</span></div>
-          <div class="go">›</div>
-        </a>
-      </div>
-    </section>
-
-    <footer class="footer">
-      <p>OrbitBills is a product of <strong style="color:var(--brand)">TechSerenia</strong></p>
-      <p style="margin-top:8px">
-        <a href="aboutus.html">About</a> ·
-        <a href="contact.html">Contact</a> ·
-        <a href="privacy-policy.html">Privacy</a> ·
-        <a href="terms-of-use.html">Terms</a>
-      </p>
-    </footer>
-  </div>
-
+  <footer class="footer">
+    <p>OrbitBills is a product of <strong style="color:var(--blue)">TechSerenia</strong></p>
+    <p style="margin-top:8px"><a href="aboutus.html">About</a> · <a href="contact.html">Contact</a> · <a href="privacy-policy.html">Privacy</a> · <a href="terms-of-use.html">Terms</a></p>
+  </footer>
   <script>
     (function(){
-      var splash = document.getElementById('corpSplash');
-      var shell = document.getElementById('appShell');
-      var done = false;
-      function finish(){
-        if(done) return;
-        done = true;
-        if(splash) splash.classList.add('hide');
-        if(shell) shell.classList.add('show');
-        setTimeout(function(){
-          if(splash && splash.parentNode) splash.parentNode.removeChild(splash);
-        }, 500);
-      }
-      setTimeout(finish, 900);
-      window.addEventListener('load', function(){ setTimeout(finish, 200); });
-
-      var d = document.getElementById('drawer');
-      var s = document.getElementById('scrim');
+      var d=document.getElementById('drawer'), s=document.getElementById('scrim');
       function open(){ d.classList.add('open'); s.classList.add('open'); }
       function close(){ d.classList.remove('open'); s.classList.remove('open'); }
-      document.getElementById('menuBtn').onclick = open;
-      document.getElementById('menuClose').onclick = close;
-      s.onclick = close;
+      document.getElementById('menuBtn').onclick=open;
+      document.getElementById('menuClose').onclick=close;
+      s.onclick=close;
     })();
   </script>
   <script src="orbit-native.js"></script>

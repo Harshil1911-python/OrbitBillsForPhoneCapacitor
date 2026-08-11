@@ -1,10 +1,10 @@
 {
   "appName": "OrbitBills",
   "appId": "com.techserenia.orbitbills",
-  "version": "1.3.1",
+  "version": "1.0.0",
   "useLiveWebsite": false,
   "preferLiveWhenOnline": true,
-  "websiteUrl": "https://orbitbillsdemo2.onrender.com",
+  "websiteUrl": "https://orbitbillsphone.onrender.com",
   "brandColor": "#000000",
   "statusBarStyle": "LIGHT",
   "splashDurationMs": 1600,
@@ -12,7 +12,7 @@
   "allowHttp": false,
   "keyboardResize": "body",
   "extraAllowedHosts": [
-    "orbitbillsdemo2.onrender.com",
+    "orbitbillsphone.onrender.com",
     "*.onrender.com"
   ]
 }

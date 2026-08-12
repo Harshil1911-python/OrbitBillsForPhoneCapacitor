@@ -1,8 +1,13 @@
 (function(){
   if(window.__orbitNativeLoaded) return;
   window.__orbitNativeLoaded = true;
-  function hasCap(){ return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
-  function plugin(n){ try{ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[n]; }catch(e){ return null; } }
+
+  function hasCap(){
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  }
+  function plugin(n){
+    try{ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[n]; }catch(e){ return null; }
+  }
 
   // Hybrid mode: online → live site; offline → local www/ pages bundled in the APK.
   // Keep LIVE_URL in sync with app-config.json websiteUrl.
@@ -29,7 +34,6 @@
   async function tryHybridLiveRedirect(){
     if(!hasCap() || !PREFER_LIVE) return false;
     if(isOnLiveHost()) return false;
-    // Only redirect from local bundle origins
     if(!isLocalCapOrigin() && location.protocol !== "file:") return false;
     try{
       if(sessionStorage.getItem("orbit_skip_live_redirect") === "1") return false;
@@ -43,10 +47,7 @@
       }
     }catch(e){}
     if(!online) return false;
-    try{
-      // Remember we are going live so back doesn't loop oddly
-      sessionStorage.setItem("orbit_live_redirected","1");
-    }catch(e){}
+    try{ sessionStorage.setItem("orbit_live_redirected","1"); }catch(e){}
     try{
       window.location.replace(LIVE_URL.replace(/\/$/,"") + (location.pathname && location.pathname !== "/" ? location.pathname : "/index.html") + (location.search||"") + (location.hash||""));
     }catch(e){
@@ -113,7 +114,7 @@
       +     '<strong style="display:block;margin-bottom:4px;">Latest features may not work in offline mode</strong>'
       +     'When your phone is offline the app uses the pages stored inside it. New updates from the website appear automatically the next time you open the app while online.'
       +   '</div>'
-      +   '<button type="button" id="orbitOffLearnBtn" style="width:100%;margin-bottom:8px;min-height:44px;border:1px solid #dfe7f5;background:#fff;color:#0b3d91;font-weight:700;font-size:14px;border-radius:11px;cursor:pointer;font-family:inherit;">Learn more</button>'
+      +   '<button type="button" id="orbitOffLearnBtn" style="width:100%;margin-bottom:8px;border:1px solid #dfe7f5;background:#fff;color:#0b3d91;font-weight:700;font-size:14px;border-radius:11px;cursor:pointer;font-family:inherit;min-height:44px;">Learn more</button>'
       +   '<button type="button" id="orbitOffOk" style="width:100%;min-height:44px;border:0;background:#0b3d91;color:#fff;font-weight:700;font-size:14px;border-radius:11px;cursor:pointer;font-family:inherit;">OK</button>'
       + '</div>';
     (document.body||document.documentElement).appendChild(wrap);
@@ -150,58 +151,312 @@
     try{ sessionStorage.setItem("orbit_offline_modal_dismissed","1"); }catch(e){}
   }
 
+  /* ========== Local Notifications (system tray like WhatsApp / Instagram) ========== */
+  var NOTIF_CHANNEL_ID = "orbitbills_alerts";
+  var _notifReady = false;
+
+  async function ensureNotifChannel(){
+    var LN = plugin("LocalNotifications");
+    if(!LN) return false;
+    try{
+      if(LN.requestPermissions){
+        var perm = await LN.requestPermissions();
+        if(perm && perm.display === "denied") return false;
+      }
+      if(LN.createChannel){
+        await LN.createChannel({
+          id: NOTIF_CHANNEL_ID,
+          name: "OrbitBills alerts",
+          description: "Bills, low stock, expiring products",
+          importance: 5,
+          visibility: 1,
+          sound: "default",
+          vibration: true
+        });
+      }
+      _notifReady = true;
+      return true;
+    }catch(e){ return false; }
+  }
+
+  window.__orbitNotify = async function(opts){
+    opts = opts || {};
+    var title = opts.title || "OrbitBills";
+    var body = opts.body || "";
+    var id = opts.id != null ? Number(opts.id) : (Math.floor(Date.now() % 1000000) + Math.floor(Math.random()*900));
+    try{
+      if(!hasCap()){
+        if(typeof Notification !== "undefined"){
+          if(Notification.permission === "default") await Notification.requestPermission();
+          if(Notification.permission === "granted"){
+            new Notification(title, { body: body, icon: "logo.png", tag: "orbit-"+id });
+            return true;
+          }
+        }
+        return false;
+      }
+      var LN = plugin("LocalNotifications");
+      if(!LN || !LN.schedule) return false;
+      if(!_notifReady) await ensureNotifChannel();
+      await LN.schedule({
+        notifications: [{
+          id: id,
+          title: title,
+          body: body,
+          channelId: NOTIF_CHANNEL_ID,
+          sound: "default",
+          schedule: { at: new Date(Date.now() + 200) },
+          extra: opts.extra || {}
+        }]
+      });
+      return true;
+    }catch(e){
+      try{ console.warn("orbit notify", e); }catch(e2){}
+      return false;
+    }
+  };
+
+  window.__orbitNotifyInvoice = function(invNo, totalText){
+    var n = invNo || "Invoice";
+    var t = totalText || "";
+    return window.__orbitNotify({
+      title: "Bill created · " + n,
+      body: t ? ("Total " + t + " · OrbitBills") : "Invoice saved on this device",
+      id: Math.abs(String(n).split("").reduce(function(a,c){ return ((a<<5)-a)+c.charCodeAt(0)|0; },0)) % 900000 + 100
+    });
+  };
+
+  window.__orbitNotifyLowStock = function(names){
+    var list = Array.isArray(names) ? names.filter(Boolean) : [names];
+    if(!list.length) return Promise.resolve(false);
+    var body = list.slice(0, 4).join(", ");
+    if(list.length > 4) body += " +" + (list.length - 4) + " more";
+    return window.__orbitNotify({ title: "Low stock alert", body: body, id: 42001 });
+  };
+
+  window.__orbitNotifyExpiring = function(names){
+    var list = Array.isArray(names) ? names.filter(Boolean) : [names];
+    if(!list.length) return Promise.resolve(false);
+    var body = list.slice(0, 4).join(", ");
+    if(list.length > 4) body += " +" + (list.length - 4) + " more";
+    return window.__orbitNotify({ title: "Stock expiring soon", body: body, id: 42002 });
+  };
+
+  function blobToBase64(blob){
+    return new Promise(function(resolve, reject){
+      var r = new FileReader();
+      r.onload = function(){
+        var s = String(r.result || "");
+        var i = s.indexOf(",");
+        resolve(i >= 0 ? s.slice(i + 1) : s);
+      };
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
+
+  /**
+   * Share a file (PNG/PDF) via Android system share sheet so WhatsApp, Drive, etc. receive the attachment.
+   * FIX: write to CACHE/DATA via Filesystem, then Share.share({ files: [uri] }).
+   * This restores the "Sharing image / File from TechSerenia" sheet in the Capacitor APK.
+   */
+  window.__orbitNativeShare = async function(opts){
+    opts = opts || {};
+    var title = opts.title || "Invoice · TechSerenia";
+    var text = opts.text || "Invoice from TechSerenia";
+    var filename = opts.filename || ("invoice-" + Date.now() + ".png");
+    var blob = opts.blob;
+    var Share = plugin("Share");
+    var Filesystem = plugin("Filesystem");
+
+    if(hasCap() && Share && Share.share && Filesystem && Filesystem.writeFile && blob){
+      try{
+        var b64 = await blobToBase64(blob);
+        var attempts = [
+          { path: "TechSerenia/" + filename, directory: "CACHE" },
+          { path: "TechSerenia/" + filename, directory: "DATA" },
+          { path: "share/" + filename, directory: "CACHE" },
+          { path: filename, directory: "CACHE" }
+        ];
+        var uri = null;
+        for(var i = 0; i < attempts.length && !uri; i++){
+          try{
+            await Filesystem.writeFile({
+              path: attempts[i].path,
+              data: b64,
+              directory: attempts[i].directory,
+              recursive: true
+            });
+            var uriRes = await Filesystem.getUri({
+              path: attempts[i].path,
+              directory: attempts[i].directory
+            });
+            uri = uriRes && (uriRes.uri || uriRes);
+          }catch(eWrite){}
+        }
+        if(uri){
+          try{
+            await Share.share({
+              title: title,
+              text: text,
+              dialogTitle: "Share invoice",
+              files: [uri],
+              url: uri
+            });
+            return true;
+          }catch(eFiles){
+            try{
+              await Share.share({
+                title: title,
+                text: text,
+                dialogTitle: "Share invoice",
+                url: uri
+              });
+              return true;
+            }catch(eUrl){}
+          }
+        }
+      }catch(eCap){
+        try{ console.warn("orbit native share cap", eCap); }catch(e2){}
+      }
+    }
+
+    if(navigator.share && blob && filename){
+      try{
+        var file = new File([blob], filename, {
+          type: blob.type || (/\.pdf$/i.test(filename) ? "application/pdf" : "image/png")
+        });
+        var data = { title: title, text: text, files: [file] };
+        if(navigator.canShare && !navigator.canShare(data)){
+          await navigator.share({ title: title, text: text });
+          return true;
+        }
+        await navigator.share(data);
+        return true;
+      }catch(e){
+        if(e && e.name === "AbortError") return true;
+      }
+    }
+
+    if(navigator.share){
+      try{
+        await navigator.share({ title: title, text: text, url: opts.url });
+        return true;
+      }catch(e){
+        if(e && e.name === "AbortError") return true;
+      }
+    }
+    return false;
+  };
+
+  window.__orbitHaptic = async function(style){
+    try{
+      if(!hasCap()){
+        if(navigator.vibrate) navigator.vibrate(style === "error" ? 30 : 12);
+        return;
+      }
+      var H = plugin("Haptics");
+      if(!H) return;
+      if(style === "success" && H.notification) await H.notification({ type: "SUCCESS" });
+      else if(style === "error" && H.notification) await H.notification({ type: "ERROR" });
+      else if(H.impact) await H.impact({ style: "LIGHT" });
+    }catch(e){}
+  };
+
+  window.__orbitPlaySuccessTone = function(){
+    try{
+      if(typeof window.playInvoiceSuccessSound === "function"){
+        window.playInvoiceSuccessSound();
+        return;
+      }
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if(!Ctx) return;
+      var ctx = window.__orbitToneCtx || (window.__orbitToneCtx = new Ctx());
+      if(ctx.state === "suspended") ctx.resume();
+      var now = ctx.currentTime;
+      function tone(freq, start, dur, gain){
+        var o = ctx.createOscillator();
+        var g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, start);
+        g.gain.exponentialRampToValueAtTime(gain, start + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(start); o.stop(start + dur + 0.02);
+      }
+      tone(880, now, 0.12, 0.09);
+      tone(1174.66, now + 0.09, 0.16, 0.07);
+    }catch(e){}
+  };
+
   async function ready(){
-    // Hybrid: if native + online + still on local bundle → open live link so website updates appear
     try{
       var redirected = await tryHybridLiveRedirect();
       if(redirected) return true;
     }catch(e){}
 
-    if(!hasCap()){ setupNetwork(); setupBackButton(); try{ ensureNavFill("#ffffff"); }catch(e){} return false; }
+    if(!hasCap()){
+      setupNetwork();
+      setupBackButton();
+      try{ ensureNavFill("#ffffff"); }catch(e){}
+      return false;
+    }
     await setChromeColors();
-    try{ var Splash=plugin("SplashScreen"); if(Splash&&Splash.hide) await Splash.hide({fadeOutDuration:250}); }catch(e){}
-    try{ var Keyboard=plugin("Keyboard"); if(Keyboard&&Keyboard.setResizeMode) await Keyboard.setResizeMode({mode:"body"}); }catch(e){}
-    setupNetwork(); setupBackButton();
-    try{ if(/billing\.html/i.test(location.pathname||"") && navigator.wakeLock && navigator.wakeLock.request){ try{ window.__orbitWake=await navigator.wakeLock.request("screen"); }catch(e){} } }catch(e){}
+    try{
+      var Splash = plugin("SplashScreen");
+      if(Splash && Splash.hide) await Splash.hide({ fadeOutDuration: 250 });
+    }catch(e){}
+    try{
+      var Keyboard = plugin("Keyboard");
+      if(Keyboard && Keyboard.setResizeMode) await Keyboard.setResizeMode({ mode: "body" });
+    }catch(e){}
+    setupNetwork();
+    setupBackButton();
+    try{ await ensureNotifChannel(); }catch(e){}
+    try{
+      if(/billing\.html/i.test(location.pathname || "") && navigator.wakeLock && navigator.wakeLock.request){
+        try{ window.__orbitWake = await navigator.wakeLock.request("screen"); }catch(e){}
+      }
+    }catch(e){}
     return true;
   }
+
   function setupNetwork(){
-    var Network=plugin("Network");
-    var bar=document.getElementById("orbitOfflineBanner");
+    var Network = plugin("Network");
+    var bar = document.getElementById("orbitOfflineBanner");
     if(!bar){
-      bar=document.createElement("div");
-      bar.id="orbitOfflineBanner";
-      bar.style.cssText="display:none;position:fixed;left:0;right:0;top:0;z-index:99999;background:#b91c1c;color:#fff;font:600 13px/1.3 system-ui,sans-serif;padding:8px 40px 8px 12px;padding-top:max(8px,env(safe-area-inset-top));text-align:center;box-sizing:border-box;";
-      var msg=document.createElement("span");
-      msg.id="orbitOfflineBannerText";
-      msg.textContent="You are offline — data stays on this device";
+      bar = document.createElement("div");
+      bar.id = "orbitOfflineBanner";
+      bar.style.cssText = "display:none;position:fixed;left:0;right:0;top:0;z-index:99999;background:#b91c1c;color:#fff;font:600 13px/1.3 system-ui,sans-serif;padding:8px 40px 8px 12px;padding-top:max(8px,env(safe-area-inset-top));text-align:center;box-sizing:border-box;";
+      var msg = document.createElement("span");
+      msg.id = "orbitOfflineBannerText";
+      msg.textContent = "You are offline — data stays on this device";
       bar.appendChild(msg);
-      var x=document.createElement("button");
-      x.type="button";
-      x.id="orbitOfflineBannerClose";
-      x.setAttribute("aria-label","Dismiss offline notice");
-      x.textContent="×";
-      x.style.cssText="position:absolute;right:8px;top:50%;transform:translateY(-50%);margin-top:max(0px,env(safe-area-inset-top)/2);width:32px;height:32px;border:0;background:transparent;color:#fff;font:700 22px/1 system-ui,sans-serif;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;";
-      x.addEventListener("click",function(e){
+      var x = document.createElement("button");
+      x.type = "button";
+      x.id = "orbitOfflineBannerClose";
+      x.setAttribute("aria-label", "Dismiss offline notice");
+      x.textContent = "×";
+      x.style.cssText = "position:absolute;right:8px;top:50%;transform:translateY(-50%);margin-top:max(0px,env(safe-area-inset-top)/2);width:32px;height:32px;border:0;background:transparent;color:#fff;font:700 22px/1 system-ui,sans-serif;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;";
+      x.addEventListener("click", function(e){
         try{ e.preventDefault(); e.stopPropagation(); }catch(err){}
-        try{ sessionStorage.setItem("orbit_offline_banner_dismissed","1"); }catch(err){}
-        bar.style.display="none";
-        bar.setAttribute("data-dismissed","1");
+        try{ sessionStorage.setItem("orbit_offline_banner_dismissed", "1"); }catch(err){}
+        bar.style.display = "none";
+        bar.setAttribute("data-dismissed", "1");
       });
       bar.appendChild(x);
-      bar.style.position="fixed";
-      (document.body||document.documentElement).appendChild(bar);
+      (document.body || document.documentElement).appendChild(bar);
     }
     function isDismissed(){
-      if(bar.getAttribute("data-dismissed")==="1") return true;
-      try{ return sessionStorage.getItem("orbit_offline_banner_dismissed")==="1"; }catch(e){ return false; }
+      if(bar.getAttribute("data-dismissed") === "1") return true;
+      try{ return sessionStorage.getItem("orbit_offline_banner_dismissed") === "1"; }catch(e){ return false; }
     }
     function setOnline(ok){
       if(ok){
-        bar.style.display="none";
+        bar.style.display = "none";
         try{ sessionStorage.removeItem("orbit_offline_banner_dismissed"); }catch(e){}
         bar.removeAttribute("data-dismissed");
-        // If we came back online while still on local bundle, try live redirect once
         try{
           if(hasCap() && PREFER_LIVE && !isOnLiveHost() && (isLocalCapOrigin() || location.protocol === "file:")){
             if(sessionStorage.getItem("orbit_live_redirected") !== "1"){
@@ -211,12 +466,11 @@
         }catch(e){}
         return;
       }
-      if(isDismissed()){ bar.style.display="none"; }
-      else { bar.style.display="block"; }
-      // Popup once per session when offline
+      if(isDismissed()){ bar.style.display = "none"; }
+      else { bar.style.display = "block"; }
       try{ showOfflineModal(); }catch(e){}
     }
-    if(Network&&Network.getStatus){
+    if(Network && Network.getStatus){
       Network.getStatus().then(function(s){ setOnline(!!s.connected); }).catch(function(){});
       if(Network.addListener) Network.addListener("networkStatusChange", function(s){ setOnline(!!s.connected); });
     } else {
@@ -225,83 +479,38 @@
       window.addEventListener("offline", function(){ setOnline(false); });
     }
   }
+
   function setupBackButton(){
-    var App=plugin("App");
-    window.__orbitAndroidBack=function(){
-      if(document.body&&document.body.classList.contains("m-cart-open")){ if(window.__orbitCloseMobileCart) window.__orbitCloseMobileCart(); else document.body.classList.remove("m-cart-open"); return true; }
-      var menu=document.getElementById("mobileMenu");
-      if(menu&&menu.classList.contains("open")){ if(window.__orbitCloseMobileMenu) window.__orbitCloseMobileMenu(); else menu.classList.remove("open"); return true; }
-      var openModal=document.querySelector(".modal-bg.open");
-      if(openModal){ openModal.classList.remove("open"); return true; }
-      var offModal=document.getElementById("orbitOfflineModal");
+    var App = plugin("App");
+    window.__orbitAndroidBack = function(){
+      if(document.body && document.body.classList.contains("m-cart-open")){
+        if(window.__orbitCloseMobileCart) window.__orbitCloseMobileCart();
+        else document.body.classList.remove("m-cart-open");
+        return true;
+      }
+      var menu = document.getElementById("mobileMenu");
+      if(menu && menu.classList.contains("open")){
+        if(window.__orbitCloseMobileMenu) window.__orbitCloseMobileMenu();
+        else menu.classList.remove("open");
+        return true;
+      }
+      var openModalEl = document.querySelector(".modal-bg.open");
+      if(openModalEl){ openModalEl.classList.remove("open"); return true; }
+      var offModal = document.getElementById("orbitOfflineModal");
       if(offModal && offModal.style.display === "flex"){ hideOfflineModal(); return true; }
-      if(window.history.length>1){ history.back(); return true; }
+      if(window.history.length > 1){ history.back(); return true; }
       return false;
     };
-    if(App&&App.addListener){ App.addListener("backButton", function(){ var handled=false; try{ handled=!!window.__orbitAndroidBack(); }catch(e){} if(!handled&&App.exitApp) App.exitApp(); }); }
+    if(App && App.addListener){
+      App.addListener("backButton", function(){
+        var handled = false;
+        try{ handled = !!window.__orbitAndroidBack(); }catch(e){}
+        if(!handled && App.exitApp) App.exitApp();
+      });
+    }
   }
-  window.__orbitHaptic=async function(style){
-    try{
-      if(!hasCap()){ if(navigator.vibrate) navigator.vibrate(style==="error"?30:12); return; }
-      var H=plugin("Haptics"); if(!H) return;
-      if(style==="success"&&H.notification) await H.notification({type:"SUCCESS"});
-      else if(style==="error"&&H.notification) await H.notification({type:"ERROR"});
-      else if(H.impact) await H.impact({style:"LIGHT"});
-    }catch(e){}
-  };
-  window.__orbitNativeShare=async function(opts){
-    opts=opts||{};
-    var title=opts.title||"Invoice · TechSerenia";
-    var text=opts.text||"Invoice from TechSerenia";
-    var Share=plugin("Share"); var Filesystem=plugin("Filesystem");
-    // Capacitor: write to cache + share file URI so WhatsApp/Drive get the attachment
-    if(Share&&Share.share&&Filesystem&&opts.blob&&opts.filename){
-      try{
-        var b64=await new Promise(function(resolve,reject){
-          var r=new FileReader();
-          r.onload=function(){ var s=String(r.result||""); var i=s.indexOf(","); resolve(i>=0?s.slice(i+1):s); };
-          r.onerror=reject;
-          r.readAsDataURL(opts.blob);
-        });
-        var path="TechSerenia/"+opts.filename;
-        await Filesystem.writeFile({path:path,data:b64,directory:"CACHE",recursive:true});
-        var uriRes=await Filesystem.getUri({path:path,directory:"CACHE"});
-        var uri=uriRes&&(uriRes.uri||uriRes);
-        try{
-          await Share.share({ title:title, text:text, url:uri, dialogTitle:"Share invoice", files: uri ? [uri] : undefined });
-        }catch(e1){
-          await Share.share({ title:title, text:text, url:uri, dialogTitle:"Share invoice" });
-        }
-        return true;
-      }catch(e){}
-    }
-    // Web Share Level 2 — attach File (works in Chrome Android / many WebViews)
-    if(navigator.share && opts.blob && opts.filename){
-      try{
-        var file=new File([opts.blob], opts.filename, {
-          type: opts.blob.type || (/\.pdf$/i.test(opts.filename) ? "application/pdf" : "image/png")
-        });
-        var data={ title:title, text:text, files:[file] };
-        if(navigator.canShare && !navigator.canShare(data)){
-          await navigator.share({ title:title, text:text });
-          return true;
-        }
-        await navigator.share(data);
-        return true;
-      }catch(e){
-        if(e && e.name==="AbortError") return true;
-      }
-    }
-    if(navigator.share){
-      try{
-        await navigator.share({ title:title, text:text, url:opts.url });
-        return true;
-      }catch(e){
-        if(e && e.name==="AbortError") return true;
-      }
-    }
-    return false;
-  };
-  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", ready); else ready();
+
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
+  else ready();
   window.addEventListener("load", ready);
 })();

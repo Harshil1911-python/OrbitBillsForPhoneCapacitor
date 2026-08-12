@@ -4,7 +4,8 @@
   function hasCap(){ return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
   function plugin(n){ try{ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[n]; }catch(e){ return null; } }
 
-  // Live site used when phone is online (hybrid mode). Keep in sync with app-config.json websiteUrl.
+  // Hybrid mode: online → live site; offline → local www/ pages bundled in the APK.
+  // Keep LIVE_URL in sync with app-config.json websiteUrl.
   var LIVE_URL = "https://orbitbillsphone.onrender.com";
   var PREFER_LIVE = true;
 
@@ -250,17 +251,55 @@
   };
   window.__orbitNativeShare=async function(opts){
     opts=opts||{};
+    var title=opts.title||"Invoice · TechSerenia";
+    var text=opts.text||"Invoice from TechSerenia";
     var Share=plugin("Share"); var Filesystem=plugin("Filesystem");
+    // Capacitor: write to cache + share file URI so WhatsApp/Drive get the attachment
     if(Share&&Share.share&&Filesystem&&opts.blob&&opts.filename){
-      var b64=await new Promise(function(resolve,reject){ var r=new FileReader(); r.onload=function(){ var s=String(r.result||""); var i=s.indexOf(","); resolve(i>=0?s.slice(i+1):s); }; r.onerror=reject; r.readAsDataURL(opts.blob); });
-      var path="OrbitBills/"+opts.filename;
-      await Filesystem.writeFile({path:path,data:b64,directory:"CACHE",recursive:true});
-      var uriRes=await Filesystem.getUri({path:path,directory:"CACHE"});
-      var uri=uriRes&&(uriRes.uri||uriRes);
-      await Share.share({title:opts.title||"OrbitBills",text:opts.text||"",url:uri,dialogTitle:"Share"});
-      return true;
+      try{
+        var b64=await new Promise(function(resolve,reject){
+          var r=new FileReader();
+          r.onload=function(){ var s=String(r.result||""); var i=s.indexOf(","); resolve(i>=0?s.slice(i+1):s); };
+          r.onerror=reject;
+          r.readAsDataURL(opts.blob);
+        });
+        var path="TechSerenia/"+opts.filename;
+        await Filesystem.writeFile({path:path,data:b64,directory:"CACHE",recursive:true});
+        var uriRes=await Filesystem.getUri({path:path,directory:"CACHE"});
+        var uri=uriRes&&(uriRes.uri||uriRes);
+        try{
+          await Share.share({ title:title, text:text, url:uri, dialogTitle:"Share invoice", files: uri ? [uri] : undefined });
+        }catch(e1){
+          await Share.share({ title:title, text:text, url:uri, dialogTitle:"Share invoice" });
+        }
+        return true;
+      }catch(e){}
     }
-    if(navigator.share){ await navigator.share({title:opts.title,text:opts.text,url:opts.url}); return true; }
+    // Web Share Level 2 — attach File (works in Chrome Android / many WebViews)
+    if(navigator.share && opts.blob && opts.filename){
+      try{
+        var file=new File([opts.blob], opts.filename, {
+          type: opts.blob.type || (/\.pdf$/i.test(opts.filename) ? "application/pdf" : "image/png")
+        });
+        var data={ title:title, text:text, files:[file] };
+        if(navigator.canShare && !navigator.canShare(data)){
+          await navigator.share({ title:title, text:text });
+          return true;
+        }
+        await navigator.share(data);
+        return true;
+      }catch(e){
+        if(e && e.name==="AbortError") return true;
+      }
+    }
+    if(navigator.share){
+      try{
+        await navigator.share({ title:title, text:text, url:opts.url });
+        return true;
+      }catch(e){
+        if(e && e.name==="AbortError") return true;
+      }
+    }
     return false;
   };
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", ready); else ready();

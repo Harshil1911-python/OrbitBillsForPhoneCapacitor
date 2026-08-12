@@ -16,7 +16,7 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="theme-color" content="#0b3d91">
 <meta name="color-scheme" content="light">
-<title>Billing · OrbitBills</title>
+<title>Billing · TechSerenia</title>
 <link rel="icon" href="favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -143,7 +143,7 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 /* ========== OrbitBills Mobile POS (presentation only) ========== */
 .m-only{display:none}
 .d-only{display:initial}
-.mobile-menu-btn,.mobile-menu,.m-cart-bar,.m-cart-sheet,.m-cart-backdrop{display:none}
+.mobile-menu-btn,.mobile-menu,.m-cart-bar,.m-cart-sheet,.m-cart-backdrop,.pos-bottom-nav,.pos-filter-row{display:none}
 #btnScanPrimary{display:none}
 #btnShowMoreProducts,#btnShowMorePhotos{display:none}
 
@@ -153,10 +153,14 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 
   html,body{max-width:100%;overflow-x:hidden}
   body{
-    /* Reserve space for fixed header so content never scrolls under logo/menu */
-    padding-top:calc(52px + env(safe-area-inset-top, 0px));
-    background:var(--bg);
+    /* Reserve space for fixed header — match header height exactly (no extra gap) */
+    padding-top:calc(48px + env(safe-area-inset-top, 0px));
+    background:#f8fafc;
+    -webkit-tap-highlight-color:transparent;
+    -webkit-user-select:none;
+    user-select:none;
   }
+  body input, body textarea, body select{ -webkit-user-select:text; user-select:text; }
 
   /* Permanent white strip behind status bar (battery / time) — never overscrolled */
   body::before{
@@ -175,21 +179,24 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
     position:fixed!important;
     top:0;left:0;right:0;
     z-index:65;
-    padding:8px 12px;
-    padding-top:max(8px, env(safe-area-inset-top, 0px));
-    min-height:calc(52px + env(safe-area-inset-top, 0px));
+    padding:6px 12px;
+    padding-top:max(6px, env(safe-area-inset-top, 0px));
+    min-height:calc(48px + env(safe-area-inset-top, 0px));
+    height:calc(48px + env(safe-area-inset-top, 0px));
     flex-wrap:nowrap;gap:8px;
     align-items:center;
     box-sizing:border-box;
     background:#0b3d91!important;
     border-bottom:none!important;
-    box-shadow:0 2px 10px rgba(11,61,145,.28);
+    box-shadow:none;
   }
   body::before{background:#0b3d91!important}
-  .brand{font-size:15px;gap:6px;min-width:0;line-height:1;align-items:center;color:#fff!important}
+  .brand{font-size:15px;gap:8px;min-width:0;line-height:1;align-items:center;color:#fff!important}
   .brand .brand-mark{height:30px!important;display:flex;align-items:center}
-  .brand .brand-mark img{height:30px!important;width:auto;display:block;filter:brightness(0) invert(1)}
-  .brand span{display:none}
+  .brand .brand-mark img{height:30px!important;width:auto;max-width:160px;display:block;filter:brightness(0) invert(1);object-fit:contain}
+  /* Logo image already includes TechSerenia wordmark — avoid double text */
+  .brand .brand-name-text{display:none!important}
+  .brand span:not(.brand-name-text){display:none}
   .header-actions{gap:6px;flex-wrap:nowrap;overflow:visible;width:auto;margin-left:auto;align-items:center}
   .header-actions > .btn,
   .header-actions > .pill,
@@ -264,16 +271,21 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
     background:#f8fafc;border-radius:10px;margin:2px 4px
   }
 
-  /* Single column — products primary */
+  /* Single column — kill double top gap (base .layout had padding-top + body padding-top) */
   .layout{
     display:flex!important;flex-direction:column;
-    min-height:auto;
-    padding-bottom:calc(58px + env(safe-area-inset-bottom,0px));
+    min-height:auto!important;
+    padding-top:0!important;
+    margin-top:0!important;
+    padding-bottom:calc(118px + env(safe-area-inset-bottom,0px));
   }
   .sales-side{
     border-right:0;border-bottom:none;
-    padding:10px 12px 12px;overflow:visible;min-width:0;width:100%
+    padding:0 10px 12px!important;
+    margin:0!important;
+    overflow:visible;min-width:0;width:100%
   }
+  .low-banner{margin:0 0 4px!important;border-radius:0!important}
 
   /* Cart moves into bottom sheet on mobile — hide inline cart column content from flow
      but keep in DOM for JS. Visual cart is the sheet. */
@@ -395,24 +407,42 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 
   .m-sticky-tools{
     position:sticky;top:0;z-index:40;
-    background:var(--bg);padding:6px 0 8px;
-    margin:0 -12px;padding-left:12px;padding-right:12px;
-    border-bottom:1px solid var(--line);
+    background:#f8fafc;padding:8px 12px 8px;
+    margin:0 -12px;
+    border-bottom:1px solid #e2e8f0;
   }
-  .m-sticky-tools .panel-tabs{margin-bottom:8px}
-  .m-sticky-tools .search-bar{margin-bottom:0}
+  /* Top Products/Photos/Held/Recent removed — use bottom nav instead */
+  .m-sticky-tools .panel-tabs{display:none!important;margin:0;height:0;overflow:hidden;padding:0;border:0}
+  .m-sticky-tools .search-bar{margin-bottom:6px;margin-top:0}
   .search-bar #scanField{
     max-width:none!important;flex:0 0 auto;min-width:0;
-    order:3;display:none!important;
+    order:4;display:none!important;
   }
   .search-bar #btnScanPrimary{
-    display:inline-flex!important;align-items:center;justify-content:center;
-    min-height:46px;padding:10px 14px;border-radius:12px;
-    background:var(--brand);color:#fff;border:0;font-weight:700;font-size:14px;
-    flex:0 0 auto;white-space:nowrap;
+    display:inline-flex!important;align-items:center;justify-content:center;gap:6px;
+    min-height:44px;padding:8px 12px;border-radius:12px;
+    background:var(--brand);color:#fff;border:0;font-weight:700;font-size:13px;
+    flex:0 0 auto;white-space:nowrap;order:1;
   }
-  .search-bar #productSearch{order:1;flex:1}
-  .search-bar #categoryFilter{order:2}
+  .search-bar #btnScanPrimary svg{flex-shrink:0}
+  .search-bar #productSearch{order:2;flex:1;min-width:0}
+  .search-bar #categoryFilter{order:3;max-width:120px}
+  .pos-filter-row{
+    display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:2px;
+  }
+  .pos-filter-btn{
+    flex:1 1 auto;min-height:40px;padding:8px 12px;border-radius:10px;
+    border:1px solid #e2e8f0;background:#fff;color:#0f172a;
+    font-size:13px;font-weight:600;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .pos-filter-btn.active{
+    background:#0b3d91;color:#fff;border-color:#0b3d91;
+  }
+  .pos-filter-btn.pos-filter-clear{
+    flex:0 0 auto;background:#fef2f2;color:#b91c1c;border-color:#fecaca;
+  }
+  #stockSummary{display:none!important}
   .low-banner{display:none;position:relative;padding-right:36px}
   .low-banner .lb-dismiss{
     position:absolute;right:6px;top:50%;transform:translateY(-50%);
@@ -431,11 +461,12 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
   /* Low banners compact */
   .low-banner{font-size:12.5px;padding:8px 10px;border-radius:10px;margin-bottom:8px}
 
-  /* Sticky cart bar — bill-book style: dark strip + green charge */
+  /* Sticky cart bar — sits above bottom nav */
   .m-cart-bar{
-    display:flex!important;position:fixed;left:0;right:0;bottom:0;z-index:100;
+    display:flex!important;position:fixed;left:0;right:0;
+    bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:100;
     align-items:center;gap:8px;
-    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
+    padding:10px 12px;
     background:#0f172a;color:#fff;
     box-shadow:0 -8px 28px rgba(15,23,42,.28);
     cursor:pointer;-webkit-tap-highlight-color:transparent;
@@ -443,8 +474,28 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
   #orbitNavFill,.orbit-nav-fill{
     position:fixed!important;left:0!important;right:0!important;bottom:0!important;
     height:max(env(safe-area-inset-bottom,0px),0px)!important;
-    background:#0f172a!important;z-index:99!important;pointer-events:none!important;
+    background:#fff!important;z-index:98!important;pointer-events:none!important;
   }
+  .pos-bottom-nav{
+    display:flex!important;position:fixed;left:0;right:0;
+    bottom:0;z-index:101;
+    height:calc(56px + env(safe-area-inset-bottom,0px));
+    padding:4px 2px calc(4px + env(safe-area-inset-bottom,0px));
+    background:#fff;border-top:1px solid #e2e8f0;
+    box-shadow:0 -2px 12px rgba(15,23,42,.06);
+    align-items:stretch;justify-content:space-around;gap:0;
+  }
+  .pos-nav-item{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;border:0;background:transparent;color:#64748b;cursor:pointer;
+    padding:4px 2px;min-height:48px;border-radius:10px;
+    -webkit-tap-highlight-color:transparent;font-family:inherit;
+  }
+  .pos-nav-item span{font-size:10px;font-weight:600;line-height:1.1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pos-nav-item svg{flex-shrink:0;stroke:#64748b}
+  .pos-nav-item.active{color:#0b3d91}
+  .pos-nav-item.active svg{stroke:#0b3d91}
+  .pos-nav-item:active{background:#f1f5f9}
   .m-cart-bar .mcb-info{flex:1;min-width:0}
   .m-cart-bar .mcb-label{font-size:11px;opacity:.85;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
   .m-cart-bar .mcb-amt{font-family:var(--display);font-weight:700;font-size:20px;line-height:1.15;color:#fff}
@@ -485,16 +536,8 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
     min-height:48px!important;font-weight:700!important;border-radius:12px!important
   }
 
-  /* Calculator above cart bar */
-  #calcFab{
-    right:14px!important;
-    bottom:calc(80px + env(safe-area-inset-bottom,0px))!important;
-    z-index:10050!important;
-    touch-action:manipulation!important;
-  }
-  body.m-cart-open #calcFab{
-    bottom:calc(24px + env(safe-area-inset-bottom,0px))!important;
-  }
+  /* Floating calculator removed on mobile — use bottom nav Calculator */
+  #calcFab{display:none!important}
   #calcPopup{
     left:50%!important;right:auto!important;
     top:50%!important;bottom:auto!important;
@@ -552,7 +595,7 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 }
 
 @media (min-width:769px){
-  .mobile-menu-btn,.mobile-menu,.m-cart-bar,.m-cart-backdrop,.m-cart-close{display:none!important}
+  .mobile-menu-btn,.mobile-menu,.m-cart-bar,.m-cart-backdrop,.m-cart-close,.pos-bottom-nav,.pos-filter-row{display:none!important}
   body.m-cart-open .cart-side{transform:none!important;position:static!important;max-height:none!important}
 }
 
@@ -577,7 +620,9 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
   }
   .layout{
     min-height:auto!important;
-    padding-bottom:calc(58px + env(safe-area-inset-bottom,0px))!important;
+    padding-top:0!important;
+    margin-top:0!important;
+    padding-bottom:calc(118px + env(safe-area-inset-bottom,0px))!important;
     overflow:visible!important;
     touch-action:pan-y!important;
   }
@@ -926,7 +971,7 @@ input,select,textarea{
     <span class="brand-mark" style="height:34px;display:flex;align-items:center;flex-shrink:0">
       <img src="logo.png" alt="TechSerenia" style="height:100%;width:auto;display:block" onerror="this.style.display='none'">
     </span>
-    <span>OrbitBills</span> <span>Billing</span>
+    <span class="brand-name-text">TechSerenia</span>
   </div>
   <div class="header-actions">
     <span class="badge" id="indiaClock" title="India Standard Time" style="font-variant-numeric:tabular-nums;min-width:118px;text-align:center">—</span>
@@ -999,15 +1044,23 @@ input,select,textarea{
     <button class="panel-tab" data-panel="recentPanel" type="button">Recent</button>
   </div>
   <div class="search-bar">
-    <input id="productSearch" placeholder="Search" autocomplete="off">
-    <select id="categoryFilter" title="Filter by category" style="max-width:140px;min-width:110px">
-      <option value="">All categories</option>
+    <button type="button" class="btn btn-primary" id="btnScanPrimary" title="Scan barcode">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+      Scan
+    </button>
+    <input id="productSearch" placeholder="Search" autocomplete="off" inputmode="search" enterkeyhint="search">
+    <select id="categoryFilter" title="Categories" style="max-width:120px;min-width:96px">
+      <option value="">Categories</option>
     </select>
-    <button type="button" class="btn btn-primary" id="btnScanPrimary" title="Scan barcode">Scan</button>
     <input id="scanField" placeholder="Barcode" style="max-width:120px" autocomplete="off">
   </div>
+  <div class="pos-filter-row" id="posFilterRow">
+    <button type="button" class="pos-filter-btn" id="btnFilterOos" data-filter="oos">Out of stock</button>
+    <button type="button" class="pos-filter-btn" id="btnFilterExp" data-filter="expiring">Expiring</button>
+    <button type="button" class="pos-filter-btn pos-filter-clear" id="btnFilterClear" style="display:none">Clear filter</button>
   </div>
-  <div class="sales-panel active" id="textPanel"><div class="text-list" id="textList"></div><div class="empty" id="textEmpty">Type to search products by name, SKU or barcode</div><button type="button" class="btn btn-ghost btn-block" id="btnShowMoreProducts" style="display:none">Show more products</button></div>
+  </div>
+  <div class="sales-panel active" id="textPanel"><div class="text-list" id="textList"></div><div class="empty" id="textEmpty">Scan barcode or search for a product</div><button type="button" class="btn btn-ghost btn-block" id="btnShowMoreProducts" style="display:none">Show more products</button></div>
   <div class="sales-panel" id="photoPanel"><div class="photo-grid" id="photoGrid"></div><button type="button" class="btn btn-ghost btn-block" id="btnShowMorePhotos" style="display:none;margin-top:8px">Show more</button></div>
   <div class="sales-panel" id="heldPanel"><div class="toolbar"><button class="btn btn-primary btn-sm" id="btnHold" type="button">Hold cart</button></div><div id="heldList"></div></div>
   <div class="sales-panel" id="recentPanel">
@@ -1055,7 +1108,7 @@ input,select,textarea{
   <div class="form-field"><label>Client</label>
     <div style="display:flex;gap:6px;align-items:center">
       <select id="clientSelect" style="flex:1"><option value="">Walk-in</option></select>
-      <button type="button" class="btn btn-ghost btn-sm" id="btnSearchClient" title="Search customers" aria-label="Search customers" style="min-width:40px;padding:8px 10px">🔍</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnSearchClient" title="Search customers" aria-label="Search customers" style="min-width:40px;padding:8px 10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
       <button type="button" class="btn btn-ghost btn-sm" id="btnQuickClient" title="Add client">+</button>
       <button type="button" class="btn btn-ghost btn-sm" id="btnStatement" title="Client balance">Balance</button>
     </div>
@@ -1242,6 +1295,35 @@ input,select,textarea{
     <div class="msg" id="shareSheetMsg" style="margin-top:10px"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" type="button" data-close="shareSheetModal">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scan: manual entry OR camera barcode (matches IndexedDB barcode/SKU) -->
+<div class="modal-bg" id="scanModal">
+  <div class="modal" style="padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));max-width:420px">
+    <h3>Scan product</h3>
+    <p style="font-size:13px;color:var(--muted);margin:-4px 0 12px">Match barcode or SKU from your product list</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <button type="button" class="btn btn-primary" id="scanOptCamera" style="min-height:52px">Camera scan</button>
+      <button type="button" class="btn btn-ghost" id="scanOptManual" style="min-height:52px">Enter code</button>
+    </div>
+    <div id="scanManualBox" style="display:none;margin-bottom:10px">
+      <input id="scanManualInput" placeholder="Barcode or SKU" autocomplete="off" inputmode="text"
+        style="width:100%;min-height:48px;font-size:16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;box-sizing:border-box">
+      <button type="button" class="btn btn-primary btn-block" id="scanManualGo" style="margin-top:8px;min-height:48px">Find product</button>
+    </div>
+    <div id="scanCameraBox" style="display:none;margin-bottom:10px">
+      <div style="position:relative;border-radius:12px;overflow:hidden;background:#0f172a;aspect-ratio:4/3">
+        <video id="scanVideo" playsinline muted autoplay style="width:100%;height:100%;object-fit:cover;display:block"></video>
+        <div style="position:absolute;inset:18% 12%;border:2px solid rgba(255,255,255,.85);border-radius:12px;pointer-events:none"></div>
+      </div>
+      <p id="scanCameraStatus" style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center">Point camera at barcode</p>
+      <button type="button" class="btn btn-ghost btn-block" id="scanCameraStop" style="margin-top:8px;min-height:44px">Stop camera</button>
+    </div>
+    <div class="msg" id="scanModalMsg" style="margin-top:6px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" id="scanModalClose" data-close="scanModal">Close</button>
     </div>
   </div>
 </div>
@@ -2116,12 +2198,13 @@ function refreshCategoryFilterOptions(){
   if(!el) return;
   const prev=el.value;
   const cats=Array.from(new Set((allProducts||[]).map(p=>String(p.category||"").trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
-  el.innerHTML='<option value="">All categories</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  el.innerHTML='<option value="">Categories</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
   if(prev && cats.includes(prev)) el.value=prev;
 }
 let productListPageSize = 80;
 let productListShown = 80;
 let lastMatchedProducts = [];
+let posListFilter = ""; // "" | "oos" | "expiring"
 function isMobilePos(){
   try{
     if(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return true;
@@ -2135,10 +2218,22 @@ function productIsOos(p){
   if(!isFinite(stock)) return false;
   return stock <= 0;
 }
+function productIsExpiring(p, days){
+  if(!p || !p.expiry_date) return false;
+  const d = new Date(p.expiry_date);
+  if(isNaN(d.getTime())) return false;
+  const limit = Date.now() + (days || 30) * 86400000;
+  return d.getTime() <= limit;
+}
 function renderProductLists(filter){
   const term=(filter!=null?filter:(document.getElementById("productSearch")||{}).value||"").toLowerCase().trim();
   const cat=getSelectedCategory().toLowerCase();
   let matched=(allProducts||[]).slice();
+  if(posListFilter === "oos"){
+    matched = matched.filter(productIsOos);
+  } else if(posListFilter === "expiring"){
+    matched = matched.filter(p => productIsExpiring(p, 30));
+  }
   if(cat){
     matched=matched.filter(p=>String(p.category||"").trim().toLowerCase()===cat);
   }
@@ -2150,7 +2245,8 @@ function renderProductLists(filter){
   const defL=parseInt(branding.default_low_stock_limit)||5;
   const mobile=isMobilePos();
   const limit = mobile ? productListShown : matched.length;
-  const textProducts=(term||cat)?matched:[];
+  const hasFilter = !!(term || cat || posListFilter);
+  const textProducts = hasFilter ? matched : [];
   const textSlice = mobile ? textProducts.slice(0, limit) : textProducts;
   document.getElementById("textList").innerHTML=textSlice.map((p,idx)=>{
     const low=(p.stock||0)<=(p.low_stock_limit!=null?p.low_stock_limit:defL);
@@ -2171,7 +2267,9 @@ function renderProductLists(filter){
   const textEmpty=document.getElementById("textEmpty");
   if(textEmpty){
     textEmpty.style.display=textProducts.length?"none":"block";
-    textEmpty.textContent=term?"No products match your search":"Type to search products by name, SKU or barcode";
+    if(posListFilter==="oos") textEmpty.textContent = term || cat ? "No out-of-stock products match" : "No out-of-stock products";
+    else if(posListFilter==="expiring") textEmpty.textContent = term || cat ? "No expiring products match" : "No products expiring in 30 days";
+    else textEmpty.textContent = term || cat ? "No products match your search" : "Scan barcode or search for a product";
   }
   const btnMoreT=document.getElementById("btnShowMoreProducts");
   if(btnMoreT){
@@ -2222,6 +2320,71 @@ document.getElementById("btnShowMorePhotos")?.addEventListener("click",()=>{
   productListShown += productListPageSize;
   renderProductLists(document.getElementById("productSearch").value);
 });
+function setPosListFilter(mode){
+  posListFilter = mode || "";
+  productListShown = productListPageSize;
+  document.querySelectorAll(".pos-filter-btn[data-filter]").forEach(b=>{
+    b.classList.toggle("active", b.getAttribute("data-filter") === posListFilter);
+  });
+  const clr = document.getElementById("btnFilterClear");
+  if(clr) clr.style.display = posListFilter ? "inline-flex" : "none";
+  renderProductLists(document.getElementById("productSearch").value);
+}
+document.getElementById("btnFilterOos")?.addEventListener("click",()=>{
+  setPosListFilter(posListFilter === "oos" ? "" : "oos");
+});
+document.getElementById("btnFilterExp")?.addEventListener("click",()=>{
+  setPosListFilter(posListFilter === "expiring" ? "" : "expiring");
+});
+document.getElementById("btnFilterClear")?.addEventListener("click",()=>setPosListFilter(""));
+(function initPosBottomNav(){
+  // Event delegation: bottom-nav HTML is AFTER this script, so getElementById was null
+  function activateNav(nav){
+    document.querySelectorAll(".pos-nav-item").forEach(function(b){
+      b.classList.toggle("active", b.getAttribute("data-nav")===nav);
+    });
+  }
+  function switchPanel(panelId){
+    document.querySelectorAll(".panel-tab").forEach(function(t){
+      t.classList.toggle("active", t.dataset.panel === panelId);
+    });
+    document.querySelectorAll(".sales-panel").forEach(function(p){
+      p.classList.toggle("active", p.id === panelId);
+    });
+    if(panelId === "heldPanel" && typeof loadHeld === "function"){ try{ loadHeld(); }catch(e){} }
+    if(panelId === "recentPanel" && typeof renderRecentList === "function"){ try{ renderRecentList(); }catch(e){} }
+    var tools = document.getElementById("mStickyTools");
+    if(tools){
+      tools.style.display = (panelId === "textPanel" || panelId === "photoPanel") ? "" : "none";
+    }
+    try{ window.scrollTo(0, 0); }catch(e){}
+  }
+  function openCalculator(){
+    activateNav("calc");
+    if(typeof window.__orbitToggleCalc === "function"){ window.__orbitToggleCalc(); return; }
+    if(typeof window.__orbitOpenCalc === "function"){ window.__orbitOpenCalc(); return; }
+    var popup = document.getElementById("calcPopup");
+    if(popup){
+      popup.classList.add("open");
+      popup.style.display = "block";
+      window.__calcOpen = true;
+    }
+  }
+  window.__orbitSwitchPosPanel = switchPanel;
+  window.__orbitActivatePosNav = activateNav;
+  document.addEventListener("click", function(e){
+    var item = e.target && e.target.closest && e.target.closest(".pos-nav-item");
+    if(!item) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var nav = item.getAttribute("data-nav");
+    if(nav === "text"){ activateNav("text"); switchPanel("textPanel"); }
+    else if(nav === "photo"){ activateNav("photo"); switchPanel("photoPanel"); }
+    else if(nav === "held"){ activateNav("held"); switchPanel("heldPanel"); }
+    else if(nav === "recent"){ activateNav("recent"); switchPanel("recentPanel"); }
+    else if(nav === "calc"){ openCalculator(); }
+  }, true);
+})();
 document.getElementById("textList")?.addEventListener("click",e=>{
   const row=e.target.closest(".text-row[data-pid]");
   if(!row) return;
@@ -2263,11 +2426,120 @@ document.getElementById("scanField").addEventListener("keydown",e=>{
   const code=e.target.value.trim(); e.target.value="";
   processScanCode(code);
 });
-document.getElementById("btnScanPrimary")?.addEventListener("click",()=>{
-  const code=prompt("Scan or type barcode / SKU");
-  if(code==null) return;
-  processScanCode(code);
-});
+(function initScanModal(){
+  var stream=null, raf=0, detector=null, lastCode="", lastAt=0;
+  function openModal(){
+    var m=document.getElementById("scanModal");
+    if(!m) return;
+    m.classList.add("open");
+    var msg=document.getElementById("scanModalMsg");
+    if(msg) msg.textContent="";
+    document.getElementById("scanManualBox").style.display="none";
+    document.getElementById("scanCameraBox").style.display="none";
+  }
+  function closeModal(){
+    stopCamera();
+    var m=document.getElementById("scanModal");
+    if(m) m.classList.remove("open");
+  }
+  function stopCamera(){
+    if(raf){ cancelAnimationFrame(raf); raf=0; }
+    if(stream){
+      try{ stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+      stream=null;
+    }
+    var v=document.getElementById("scanVideo");
+    if(v){ try{ v.srcObject=null; }catch(e){} }
+  }
+  function onCode(code){
+    code=String(code||"").trim();
+    if(!code) return;
+    var now=Date.now();
+    if(code===lastCode && now-lastAt<1500) return;
+    lastCode=code; lastAt=now;
+    stopCamera();
+    closeModal();
+    if(typeof processScanCode==="function") processScanCode(code);
+    else if(typeof toast==="function") toast("Scanned: "+code);
+  }
+  async function startCamera(){
+    var box=document.getElementById("scanCameraBox");
+    var status=document.getElementById("scanCameraStatus");
+    var msg=document.getElementById("scanModalMsg");
+    document.getElementById("scanManualBox").style.display="none";
+    box.style.display="block";
+    if(status) status.textContent="Starting camera…";
+    stopCamera();
+    try{
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        throw new Error("Camera not available in this browser");
+      }
+      stream=await navigator.mediaDevices.getUserMedia({
+        audio:false,
+        video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1280 }, height:{ ideal:720 } }
+      });
+      var v=document.getElementById("scanVideo");
+      v.srcObject=stream;
+      await v.play();
+      if(status) status.textContent="Point camera at barcode";
+      if("BarcodeDetector" in window){
+        try{
+          detector=new BarcodeDetector({ formats:["ean_13","ean_8","code_128","code_39","qr_code","upc_a","upc_e"] });
+        }catch(e){ detector=new BarcodeDetector(); }
+        var tick=async function(){
+          if(!stream) return;
+          try{
+            if(v.readyState>=2){
+              var codes=await detector.detect(v);
+              if(codes && codes.length){
+                var raw=codes[0].rawValue || codes[0].rawValue===0 ? codes[0].rawValue : (codes[0].data||"");
+                if(raw){ onCode(String(raw)); return; }
+              }
+            }
+          }catch(e){}
+          raf=requestAnimationFrame(tick);
+        };
+        raf=requestAnimationFrame(tick);
+      } else {
+        if(status) status.textContent="Live scan needs Chrome/Edge. Use Enter code, or type barcode in Search.";
+        if(msg) msg.textContent="BarcodeDetector not supported — use Enter code";
+      }
+    }catch(err){
+      if(status) status.textContent="Camera permission denied or unavailable";
+      if(msg) msg.textContent=String(err && err.message ? err.message : err);
+      if(typeof toast==="function") toast("Camera unavailable — use Enter code");
+    }
+  }
+  document.getElementById("btnScanPrimary")?.addEventListener("click",function(){
+    openModal();
+  });
+  document.getElementById("scanOptManual")?.addEventListener("click",function(){
+    stopCamera();
+    document.getElementById("scanCameraBox").style.display="none";
+    document.getElementById("scanManualBox").style.display="block";
+    var inp=document.getElementById("scanManualInput");
+    if(inp){ inp.value=""; setTimeout(function(){ inp.focus(); }, 50); }
+  });
+  document.getElementById("scanOptCamera")?.addEventListener("click",function(){
+    startCamera();
+  });
+  document.getElementById("scanCameraStop")?.addEventListener("click",function(){
+    stopCamera();
+    document.getElementById("scanCameraBox").style.display="none";
+  });
+  document.getElementById("scanManualGo")?.addEventListener("click",function(){
+    var inp=document.getElementById("scanManualInput");
+    onCode(inp && inp.value);
+  });
+  document.getElementById("scanManualInput")?.addEventListener("keydown",function(e){
+    if(e.key==="Enter"){ e.preventDefault(); onCode(e.target.value); }
+  });
+  document.getElementById("scanModalClose")?.addEventListener("click",closeModal);
+  document.getElementById("scanModal")?.addEventListener("click",function(e){
+    if(e.target && e.target.id==="scanModal") closeModal();
+  });
+  window.__orbitOpenScanModal=openModal;
+})();
 
 function applyClients(list){
   allClients=list||[];
@@ -3817,6 +4089,9 @@ window.__calcOpen = false;
     if (isCalcOpen()) closeCalc();
     else openCalc();
   }
+  window.__orbitToggleCalc = toggleCalc;
+  window.__orbitOpenCalc = openCalc;
+  window.__orbitCloseCalc = closeCalc;
   // Event delegation so it works even if nodes are after this script
   document.addEventListener("click", function(e){
     const fab = e.target.closest && e.target.closest("#calcFab");
@@ -3905,9 +4180,33 @@ window.__calcOpen = false;
     onclick="event.stopPropagation();window.__orbitOpenMobileCart&&window.__orbitOpenMobileCart();">View bill</button>
 </div>
 
+<!-- Fixed bottom POS navigation (SVG icons, no emojis) -->
+<nav class="pos-bottom-nav" id="posBottomNav" aria-label="POS navigation">
+  <button type="button" class="pos-nav-item active" data-nav="text" id="navTextPos" title="Text POS">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    <span>Text POS</span>
+  </button>
+  <button type="button" class="pos-nav-item" data-nav="photo" id="navPhotoPos" title="Photo POS">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+    <span>Photo POS</span>
+  </button>
+  <button type="button" class="pos-nav-item" data-nav="held" id="navHeld" title="Held bills">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+    <span>Held</span>
+  </button>
+  <button type="button" class="pos-nav-item" data-nav="recent" id="navTransactions" title="Transactions">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>
+    <span>Transactions</span>
+  </button>
+  <button type="button" class="pos-nav-item" data-nav="calc" id="navCalculator" title="Calculator">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="8" y1="18" x2="8" y2="18.01"/><line x1="12" y1="18" x2="12" y2="18.01"/><line x1="16" y1="18" x2="16" y2="18.01"/></svg>
+    <span>Calculator</span>
+  </button>
+</nav>
+
 <!-- Calculator FAB -->
 <button type="button" id="calcFab" title="Calculator (press 0)" aria-label="Open calculator">
-  <img src="calc.png" alt="Calculator" onerror="this.style.display='none';this.parentElement.textContent='∑';">
+  <img src="calc.png" alt="Calculator" onerror="this.style.display='none';this.parentElement.textContent='Calc';">
 </button>
 <div id="calcPopup" role="dialog" aria-label="Calculator">
   <div class="calc-head">

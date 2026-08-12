@@ -213,7 +213,6 @@
     }catch(e){}
   };
 
-  /* Pay & Print / Pay Later / Create → share sheet with invoice file pre-attached */
   function orbitBindPostSaleShareButtons(){
     ["btnPayPrint","plConfirm","createInvoiceBtn"].forEach(function(id){
       var el = document.getElementById(id);
@@ -247,6 +246,38 @@
   setTimeout(orbitBindPostSaleShareButtons, 400);
   setTimeout(orbitBindPostSaleShareButtons, 1200);
   setTimeout(orbitBindPostSaleShareButtons, 3000);
+
+  function orbitWatchSaleSuccessForShare(){
+    if(window.__orbitSaleShareWatch) return;
+    window.__orbitSaleShareWatch = true;
+    var lastOpenedFor = null;
+    function maybeOpen(){
+      try{
+        var msg = document.getElementById("invoiceMsg");
+        if(!msg || !msg.classList.contains("ok")) return;
+        var text = (msg.textContent || "").trim();
+        if(!text || text === lastOpenedFor) return;
+        if(text.indexOf("INV") < 0 && text.indexOf("·") < 0) return;
+        lastOpenedFor = text;
+        setTimeout(function(){
+          try{
+            if(typeof window.prepareAndOpenInvoiceShare === "function"){
+              window.prepareAndOpenInvoiceShare("png");
+            }
+          }catch(e){}
+        }, 400);
+      }catch(e){}
+    }
+    try{
+      var obs = new MutationObserver(function(){ maybeOpen(); });
+      obs.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class"] });
+      setInterval(maybeOpen, 800);
+    }catch(e){}
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", orbitWatchSaleSuccessForShare);
+  else orbitWatchSaleSuccessForShare();
+  window.addEventListener("load", orbitWatchSaleSuccessForShare);
+  setTimeout(orbitWatchSaleSuccessForShare, 600);
 
   async function ready(){
     try{ if(await tryHybridLiveRedirect()) return true; }catch(e){}

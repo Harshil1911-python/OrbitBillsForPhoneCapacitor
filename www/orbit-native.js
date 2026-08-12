@@ -33,9 +33,7 @@
     if(!hasCap() || !PREFER_LIVE) return false;
     if(isOnLiveHost()) return false;
     if(!isLocalCapOrigin() && location.protocol !== "file:") return false;
-    try{
-      if(sessionStorage.getItem("orbit_skip_live_redirect") === "1") return false;
-    }catch(e){}
+    try{ if(sessionStorage.getItem("orbit_skip_live_redirect") === "1") return false; }catch(e){}
     var online = navigator.onLine;
     try{
       var Network = plugin("Network");
@@ -76,29 +74,77 @@
     }catch(e){}
   }
 
+  var NOTIF_CHANNEL_ID = "orbitbills_alerts";
+  var _notifReady = false;
+  async function ensureNotifChannel(){
+    var LN = plugin("LocalNotifications");
+    if(!LN) return false;
+    try{
+      if(LN.requestPermissions){
+        var perm = await LN.requestPermissions();
+        if(perm && perm.display === "denied") return false;
+      }
+      if(LN.createChannel){
+        await LN.createChannel({ id: NOTIF_CHANNEL_ID, name: "OrbitBills alerts", description: "Bills, low stock, expiring products", importance: 5, visibility: 1, sound: "default", vibration: true });
+      }
+      _notifReady = true;
+      return true;
+    }catch(e){ return false; }
+  }
+
+  window.__orbitNotify = async function(opts){
+    opts = opts || {};
+    var title = opts.title || "OrbitBills";
+    var body = opts.body || "";
+    var id = opts.id != null ? Number(opts.id) : (Math.floor(Date.now() % 1000000) + Math.floor(Math.random()*900));
+    try{
+      if(!hasCap()){
+        if(typeof Notification !== "undefined"){
+          if(Notification.permission === "default") await Notification.requestPermission();
+          if(Notification.permission === "granted"){ new Notification(title, { body: body, icon: "logo.png", tag: "orbit-"+id }); return true; }
+        }
+        return false;
+      }
+      var LN = plugin("LocalNotifications");
+      if(!LN || !LN.schedule) return false;
+      if(!_notifReady) await ensureNotifChannel();
+      await LN.schedule({ notifications: [{ id: id, title: title, body: body, channelId: NOTIF_CHANNEL_ID, sound: "default", schedule: { at: new Date(Date.now() + 200) }, extra: opts.extra || {} }] });
+      return true;
+    }catch(e){ return false; }
+  };
+  window.__orbitNotifyInvoice = function(invNo, totalText){
+    var n = invNo || "Invoice"; var t = totalText || "";
+    return window.__orbitNotify({ title: "Bill created · " + n, body: t ? ("Total " + t + " · OrbitBills") : "Invoice saved on this device", id: Math.abs(String(n).split("").reduce(function(a,c){ return ((a<<5)-a)+c.charCodeAt(0)|0; },0)) % 900000 + 100 });
+  };
+  window.__orbitNotifyLowStock = function(names){
+    var list = Array.isArray(names) ? names.filter(Boolean) : [names];
+    if(!list.length) return Promise.resolve(false);
+    var body = list.slice(0, 4).join(", "); if(list.length > 4) body += " +" + (list.length - 4) + " more";
+    return window.__orbitNotify({ title: "Low stock alert", body: body, id: 42001 });
+  };
+  window.__orbitNotifyExpiring = function(names){
+    var list = Array.isArray(names) ? names.filter(Boolean) : [names];
+    if(!list.length) return Promise.resolve(false);
+    var body = list.slice(0, 4).join(", "); if(list.length > 4) body += " +" + (list.length - 4) + " more";
+    return window.__orbitNotify({ title: "Stock expiring soon", body: body, id: 42002 });
+  };
+
   function blobToBase64(blob){
     return new Promise(function(resolve, reject){
       var r = new FileReader();
-      r.onload = function(){
-        var s = String(r.result || "");
-        var i = s.indexOf(",");
-        resolve(i >= 0 ? s.slice(i + 1) : s);
-      };
+      r.onload = function(){ var s = String(r.result || ""); var i = s.indexOf(","); resolve(i >= 0 ? s.slice(i + 1) : s); };
       r.onerror = reject;
       r.readAsDataURL(blob);
     });
   }
-
   function sanitizeFilename(name){
     name = String(name || ("invoice-" + Date.now() + ".png"));
     name = name.replace(/[^a-zA-Z0-9._-]/g, "_");
     if(!/\.(png|pdf|jpg|jpeg|webp)$/i.test(name)) name += ".png";
     return name.slice(0, 120);
   }
-
   function toFileUri(u){
-    if(!u) return null;
-    u = String(u);
+    if(!u) return null; u = String(u);
     if(u.indexOf("file://") === 0 || u.indexOf("content://") === 0) return u;
     if(u.charAt(0) === "/") return "file://" + u;
     return u;
@@ -119,7 +165,8 @@
           { path: filename, directory: "CACHE" },
           { path: "share_" + filename, directory: "CACHE" },
           { path: "TechSerenia/" + filename, directory: "CACHE" },
-          { path: filename, directory: "DATA" }
+          { path: filename, directory: "DATA" },
+          { path: "TechSerenia/" + filename, directory: "DATA" }
         ];
         var fileUri = null;
         for(var i = 0; i < attempts.length && !fileUri; i++){
@@ -142,7 +189,7 @@
           try{ await Share.share({ title: title, text: text, dialogTitle: "Share invoice", url: fileUri }); return true; }catch(e2){}
           try{ await Share.share({ title: title, text: text, dialogTitle: "Share invoice", files: [fileUri], url: fileUri }); return true; }catch(e3){}
         }
-      }catch(eCap){ try{ console.warn("orbit native share", eCap); }catch(e){} }
+      }catch(eCap){}
     }
     if(navigator.share && blob){
       try{
@@ -155,7 +202,18 @@
     return false;
   };
 
-  /* After Pay & Print / Pay Later / Create — open share sheet with invoice file */
+  window.__orbitHaptic = async function(style){
+    try{
+      if(!hasCap()){ if(navigator.vibrate) navigator.vibrate(style === "error" ? 30 : 12); return; }
+      var H = plugin("Haptics");
+      if(!H) return;
+      if(style === "success" && H.notification) await H.notification({ type: "SUCCESS" });
+      else if(style === "error" && H.notification) await H.notification({ type: "ERROR" });
+      else if(H.impact) await H.impact({ style: "LIGHT" });
+    }catch(e){}
+  };
+
+  /* Pay & Print / Pay Later / Create → share sheet with invoice file pre-attached */
   function orbitBindPostSaleShareButtons(){
     ["btnPayPrint","plConfirm","createInvoiceBtn"].forEach(function(id){
       var el = document.getElementById(id);
@@ -192,12 +250,12 @@
 
   async function ready(){
     try{ if(await tryHybridLiveRedirect()) return true; }catch(e){}
-    if(!hasCap()){ return false; }
+    if(!hasCap()) return false;
     try{ await setChromeColors(); }catch(e){}
     try{ var Splash = plugin("SplashScreen"); if(Splash && Splash.hide) await Splash.hide({ fadeOutDuration: 250 }); }catch(e){}
+    try{ await ensureNotifChannel(); }catch(e){}
     return true;
   }
-
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
   else ready();
   window.addEventListener("load", ready);

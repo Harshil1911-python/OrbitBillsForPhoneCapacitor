@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#0b3d91">
 <meta name="color-scheme" content="light">
 <title>Billing · OrbitBills</title>
 <link rel="icon" href="favicon.ico">
@@ -170,25 +170,25 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
     pointer-events:none;
   }
 
-  /* Fixed header: logo + ☰ stay put while page scrolls */
+  /* Fixed header — solid bill-book blue bar */
   header.app-bar{
     position:fixed!important;
     top:0;left:0;right:0;
     z-index:65;
     padding:8px 12px;
     padding-top:max(8px, env(safe-area-inset-top, 0px));
-    min-height:calc(48px + env(safe-area-inset-top, 0px));
+    min-height:calc(52px + env(safe-area-inset-top, 0px));
     flex-wrap:nowrap;gap:8px;
     align-items:center;
     box-sizing:border-box;
-    background:#ffffff!important;
-    border-bottom:1px solid var(--line);
-    /* solid white into status area so scrolled content cannot show through */
-    box-shadow:0 1px 0 #fff;
+    background:#0b3d91!important;
+    border-bottom:none!important;
+    box-shadow:0 2px 10px rgba(11,61,145,.28);
   }
-  .brand{font-size:15px;gap:6px;min-width:0;line-height:1;align-items:center}
+  body::before{background:#0b3d91!important}
+  .brand{font-size:15px;gap:6px;min-width:0;line-height:1;align-items:center;color:#fff!important}
   .brand .brand-mark{height:30px!important;display:flex;align-items:center}
-  .brand .brand-mark img{height:30px!important;width:auto;display:block}
+  .brand .brand-mark img{height:30px!important;width:auto;display:block;filter:brightness(0) invert(1)}
   .brand span{display:none}
   .header-actions{gap:6px;flex-wrap:nowrap;overflow:visible;width:auto;margin-left:auto;align-items:center}
   .header-actions > .btn,
@@ -197,13 +197,13 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
   #indiaClock{display:none!important}
   .mobile-menu-btn{
     display:inline-flex!important;align-items:center;justify-content:center;
-    width:42px;height:42px;border-radius:11px;border:1px solid var(--line);
-    background:#fff;cursor:pointer;flex-shrink:0;padding:0;
+    width:42px;height:42px;border-radius:11px;border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.15);cursor:pointer;flex-shrink:0;padding:0;
     position:relative;z-index:61;-webkit-tap-highlight-color:transparent;
-    box-shadow:0 1px 4px rgba(15,23,42,.08)
+    box-shadow:none
   }
-  .mobile-menu-btn svg{width:20px;height:20px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
-  .mobile-menu-btn svg path{stroke:var(--ink);fill:none}
+  .mobile-menu-btn svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
+  .mobile-menu-btn svg path{stroke:#fff;fill:none}
 
   /* Mobile slide-over menu — high z-index above everything except calc */
   .mobile-menu{
@@ -319,6 +319,7 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
   }
 
   /* Tabs: horizontal scroll */
+  /* Bill-book product density */
   .panel-tabs{
     width:100%;max-width:100%;
     overflow-x:auto;flex-wrap:nowrap;
@@ -335,34 +336,47 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
   }
   #scanField{max-width:100px!important}
 
-  /* Product list — card style, full height scroll */
+  /* Product list — bill-book dense cards */
   .text-list{
     max-height:none!important;
     overflow:visible!important;
     border:0;box-shadow:none;background:transparent;border-radius:0;
   }
   .text-row{
-    background:#fff;border:1px solid var(--line);border-radius:12px;
-    margin-bottom:8px;padding:12px;gap:10px;align-items:center;
+    background:#fff;border:1px solid #e2e8f0;border-radius:14px;
+    margin-bottom:8px;padding:12px 14px;gap:10px;align-items:center;
     cursor:pointer;-webkit-tap-highlight-color:transparent;
-    min-height:56px;
+    min-height:60px;
+    box-shadow:0 1px 2px rgba(15,23,42,.04);
   }
-  .text-row:active{background:var(--tint)}
-  .text-row .name{font-size:14.5px}
-  .text-row .meta{font-size:12px}
-  .text-row .price{font-size:16px;font-weight:700}
-  .text-row .btn{min-height:40px;min-width:64px;padding:8px 14px}
+  .text-row:active{background:#e8f0fe;border-color:#bfdbfe}
+  .text-row .name{font-size:14.5px;font-weight:600;color:#0f172a}
+  .text-row .meta{font-size:12px;color:#64748b}
+  .text-row .price{font-size:17px;font-weight:700;color:#0b3d91}
+  .text-row .btn{
+    min-height:40px;min-width:64px;padding:8px 14px;
+    background:#0d9f6e!important;border-color:#0d9f6e!important;color:#fff!important;
+    border-radius:10px;font-weight:700
+  }
   /* Whole-row add only on product list — keep Open/Resume/Delete clickable */
   #textList .text-row .btn{pointer-events:none}
   #recentList .text-row .btn,#heldList .text-row .btn{pointer-events:auto!important}
   .text-row.oos{opacity:.55;background:#f8fafc;filter:grayscale(.35)}
   .text-row.oos .price{color:var(--muted)}
-  .text-row.oos .btn{background:#94a3b8;border-color:#94a3b8}
+  .text-row.oos .btn{background:#94a3b8!important;border-color:#94a3b8!important}
 
   .photo-grid{
     max-height:none!important;
     overflow:visible!important;
-    grid-template-columns:repeat(2,minmax(0,1fr))!important
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:10px!important
+  }
+  .photo-grid .photo-card,
+  .photo-grid > div{
+    border-radius:14px!important;
+    border:1px solid #e2e8f0!important;
+    box-shadow:0 1px 3px rgba(15,23,42,.05)!important;
+    overflow:hidden
   }
   .photo-tile{min-height:120px;position:relative}
   .photo-tile .stock-badge{
@@ -417,32 +431,33 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
   /* Low banners compact */
   .low-banner{font-size:12.5px;padding:8px 10px;border-radius:10px;margin-bottom:8px}
 
-  /* Sticky cart bar — brand blue into system inset */
+  /* Sticky cart bar — bill-book style: dark strip + green charge */
   .m-cart-bar{
     display:flex!important;position:fixed;left:0;right:0;bottom:0;z-index:100;
-    align-items:center;gap:10px;
+    align-items:center;gap:8px;
     padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
-    background:#0b3d91;color:#fff;
-    box-shadow:0 -6px 24px rgba(11,61,145,.25);
+    background:#0f172a;color:#fff;
+    box-shadow:0 -8px 28px rgba(15,23,42,.28);
     cursor:pointer;-webkit-tap-highlight-color:transparent;
   }
   #orbitNavFill,.orbit-nav-fill{
     position:fixed!important;left:0!important;right:0!important;bottom:0!important;
     height:max(env(safe-area-inset-bottom,0px),0px)!important;
-    background:#ffffff!important;z-index:99!important;pointer-events:none!important;
+    background:#0f172a!important;z-index:99!important;pointer-events:none!important;
   }
   .m-cart-bar .mcb-info{flex:1;min-width:0}
-  .m-cart-bar .mcb-label{font-size:12px;opacity:.9;font-weight:500}
-  .m-cart-bar .mcb-amt{font-family:var(--display);font-weight:700;font-size:18px;line-height:1.15}
+  .m-cart-bar .mcb-label{font-size:11px;opacity:.85;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .m-cart-bar .mcb-amt{font-family:var(--display);font-weight:700;font-size:20px;line-height:1.15;color:#fff}
   .m-cart-bar .btn{
-    background:#fff;color:var(--brand);border:0;font-weight:700;
-    min-height:44px;padding:10px 14px;border-radius:10px;flex:0 0 auto
+    background:#0d9f6e;color:#fff;border:0;font-weight:700;
+    min-height:46px;padding:10px 16px;border-radius:12px;flex:0 0 auto;
+    box-shadow:0 2px 8px rgba(13,159,110,.35)
   }
   .m-cart-bar .btn.mcb-dl{
-    background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35)
+    background:#0d9f6e;color:#fff;border:0
   }
   .m-cart-bar .btn.mcb-clear{
-    background:transparent;color:#fecaca;border:1px solid rgba(254,202,202,.45);
+    background:transparent;color:#fca5a5;border:1px solid rgba(252,165,165,.4);
     min-height:36px;padding:6px 10px;font-size:12px;font-weight:600
   }
   body.m-cart-open .m-cart-bar{display:none!important}
@@ -459,6 +474,16 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
   .cart-side .btn-ok.btn-block,
   .cart-side #btnPayLater,
   .cart-side #btnWhatsApp{width:100%;margin-top:6px}
+  .cart-side .btn-ok.btn-block,
+  .cart-side #btnPayPrint{
+    background:#0d9f6e!important;border-color:#0d9f6e!important;color:#fff!important;
+    min-height:52px!important;font-size:16px!important;font-weight:700!important;
+    border-radius:12px!important;box-shadow:0 2px 10px rgba(13,159,110,.3)
+  }
+  .cart-side #createInvoiceBtn{
+    background:#0b3d91!important;border-color:#0b3d91!important;color:#fff!important;
+    min-height:48px!important;font-weight:700!important;border-radius:12px!important
+  }
 
   /* Calculator above cart bar */
   #calcFab{
@@ -840,32 +865,55 @@ input,select,textarea{
 
 </head>
 <body>
-<div id="orbitBoot" style="display:flex;position:fixed;inset:0;z-index:2147483646;background:#f5f8fe;flex-direction:column;padding:20px 16px;">
-  <div class="sk-grid"><div class="sk-tile"></div><div class="sk-tile"></div><div class="sk-tile"></div><div class="sk-tile"></div></div>
-  <div class="sk-card">
-    <div class="sk-row"><div class="sk-avatar"></div><div class="sk-block"><div class="sk-line" style="width:55%"></div><div class="sk-line" style="width:35%;height:10px"></div></div></div>
-    <div class="sk-row"><div class="sk-avatar"></div><div class="sk-block"><div class="sk-line" style="width:48%"></div><div class="sk-line" style="width:30%;height:10px"></div></div></div>
+<div id="orbitBoot" style="display:flex;position:fixed;inset:0;z-index:2147483646;background:#0b3d91;flex-direction:column;align-items:center;justify-content:center;padding:24px;transition:opacity .28s ease,visibility .28s ease;">
+  <div style="width:88px;height:88px;border-radius:22px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;margin-bottom:18px;animation:orbitPulse 1.2s ease-in-out infinite;">
+    <img data-orbit-logo src="logo.png" alt="" style="height:48px;width:auto;filter:brightness(0) invert(1);display:block" onerror="this.style.display='none'">
+  </div>
+  <div style="color:#fff;font-family:Inter,system-ui,sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.02em;margin-bottom:6px">OrbitBills</div>
+  <div style="color:rgba(255,255,255,.7);font-size:13px;margin-bottom:22px">Loading billing</div>
+  <div style="width:140px;height:4px;border-radius:4px;background:rgba(255,255,255,.2);overflow:hidden">
+    <div style="height:100%;width:40%;background:#0d9f6e;border-radius:4px;animation:orbitBar 1s ease-in-out infinite"></div>
   </div>
 </div>
+<style>
+@keyframes orbitPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+@keyframes orbitBar{0%{transform:translateX(-100%)}100%{transform:translateX(280%)}}
+@keyframes orbitFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes orbitPop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.text-row,.photo-grid > *{animation:orbitFadeUp .28s ease both}
+.modal-bg.open .modal{animation:orbitPop .22s cubic-bezier(.32,.72,0,1) both}
+.m-cart-bar{transition:transform .2s ease,opacity .2s ease}
+.btn{transition:transform .12s ease,background .15s ease,box-shadow .15s ease,opacity .12s ease}
+.btn:active{transform:scale(.97)}
+.panel-tab{transition:background .15s ease,color .15s ease}
+.text-row{transition:background .15s ease,border-color .15s ease,transform .12s ease}
+.text-row:active{transform:scale(.99)}
+</style>
+<script src="orbit-assets.js"></script>
 <script>
 (function(){
   function killBoot(){
     try{
       var el = document.getElementById("orbitBoot");
-      if(!el) return;
+      if(!el || el.getAttribute("data-done")==="1") return;
       el.setAttribute("data-done","1");
-      el.className = "orbit-boot-done";
-      el.style.cssText = "display:none!important;visibility:hidden!important;pointer-events:none!important;opacity:0!important;";
-      if(el.parentNode){ try{ el.parentNode.removeChild(el); }catch(e){} }
+      el.style.opacity = "0";
+      el.style.visibility = "hidden";
+      el.style.pointerEvents = "none";
+      setTimeout(function(){
+        try{
+          el.style.display = "none";
+          if(el.parentNode) el.parentNode.removeChild(el);
+        }catch(e){}
+      }, 300);
     }catch(e){}
   }
   window.__orbitHideBoot = killBoot;
-  // Hard deadlines — panel must appear within 1s
-  setTimeout(killBoot, 400);
-  setTimeout(killBoot, 800);
-  setTimeout(killBoot, 1000);
-  document.addEventListener("DOMContentLoaded", function(){ setTimeout(killBoot, 300); });
-  window.addEventListener("load", function(){ setTimeout(killBoot, 100); });
+  setTimeout(killBoot, 500);
+  setTimeout(killBoot, 900);
+  setTimeout(killBoot, 1400);
+  document.addEventListener("DOMContentLoaded", function(){ setTimeout(killBoot, 350); });
+  window.addEventListener("load", function(){ setTimeout(killBoot, 120); });
 })();
 </script>
 
@@ -3854,7 +3902,7 @@ window.__calcOpen = false;
   <button type="button" class="btn mcb-dl" id="mCartDlBtn"
     onclick="event.stopPropagation();window.__orbitOpenDownloads&&window.__orbitOpenDownloads();" title="Downloads">Files</button>
   <button type="button" class="btn" id="mCartOpenBtn"
-    onclick="event.stopPropagation();window.__orbitOpenMobileCart&&window.__orbitOpenMobileCart();">Cart</button>
+    onclick="event.stopPropagation();window.__orbitOpenMobileCart&&window.__orbitOpenMobileCart();">View bill</button>
 </div>
 
 <!-- Calculator FAB -->

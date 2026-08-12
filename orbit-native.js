@@ -255,16 +255,33 @@
     });
   }
 
+  function sanitizeFilename(name){
+    name = String(name || ("invoice-" + Date.now() + ".png"));
+    name = name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    if(!/\.(png|pdf|jpg|jpeg|webp)$/i.test(name)){
+      name += ".png";
+    }
+    return name.slice(0, 120);
+  }
+
+  function toFileUri(u){
+    if(!u) return null;
+    u = String(u);
+    if(u.indexOf("file://") === 0) return u;
+    if(u.indexOf("content://") === 0) return u;
+    if(u.charAt(0) === "/") return "file://" + u;
+    return u;
+  }
+
   /**
-   * Share a file (PNG/PDF) via Android system share sheet so WhatsApp, Drive, etc. receive the attachment.
-   * FIX: write to CACHE/DATA via Filesystem, then Share.share({ files: [uri] }).
-   * This restores the "Sharing image / File from TechSerenia" sheet in the Capacitor APK.
+   * Share PNG/PDF via Android system share sheet (WhatsApp, Drive, etc.).
+   * Capacitor Share requires file:// URLs in files[]; CACHE is allowed by default FileProvider.
    */
   window.__orbitNativeShare = async function(opts){
     opts = opts || {};
     var title = opts.title || "Invoice · TechSerenia";
     var text = opts.text || "Invoice from TechSerenia";
-    var filename = opts.filename || ("invoice-" + Date.now() + ".png");
+    var filename = sanitizeFilename(opts.filename);
     var blob = opts.blob;
     var Share = plugin("Share");
     var Filesystem = plugin("Filesystem");
@@ -273,48 +290,81 @@
       try{
         var b64 = await blobToBase64(blob);
         var attempts = [
+          { path: filename, directory: "CACHE" },
+          { path: "share_" + filename, directory: "CACHE" },
           { path: "TechSerenia/" + filename, directory: "CACHE" },
-          { path: "TechSerenia/" + filename, directory: "DATA" },
-          { path: "share/" + filename, directory: "CACHE" },
-          { path: filename, directory: "CACHE" }
+          { path: filename, directory: "DATA" },
+          { path: "TechSerenia/" + filename, directory: "DATA" }
         ];
-        var uri = null;
-        for(var i = 0; i < attempts.length && !uri; i++){
+        var fileUri = null;
+        var lastErr = null;
+        for(var i = 0; i < attempts.length && !fileUri; i++){
           try{
-            await Filesystem.writeFile({
+            var writeRes = await Filesystem.writeFile({
               path: attempts[i].path,
               data: b64,
               directory: attempts[i].directory,
               recursive: true
             });
-            var uriRes = await Filesystem.getUri({
-              path: attempts[i].path,
-              directory: attempts[i].directory
-            });
-            uri = uriRes && (uriRes.uri || uriRes);
-          }catch(eWrite){}
+            var candidate = writeRes && (writeRes.uri || null);
+            if(!candidate){
+              var uriRes = await Filesystem.getUri({
+                path: attempts[i].path,
+                directory: attempts[i].directory
+              });
+              candidate = uriRes && (uriRes.uri || uriRes);
+            }
+            candidate = toFileUri(candidate);
+            if(candidate){
+              if(candidate.indexOf("file://") === 0){
+                fileUri = candidate;
+              } else if(!fileUri){
+                fileUri = candidate;
+              }
+            }
+          }catch(eWrite){
+            lastErr = eWrite;
+          }
         }
-        if(uri){
-          try{
-            await Share.share({
-              title: title,
-              text: text,
-              dialogTitle: "Share invoice",
-              files: [uri],
-              url: uri
-            });
-            return true;
-          }catch(eFiles){
+        if(fileUri){
+          if(fileUri.indexOf("file://") === 0){
             try{
               await Share.share({
                 title: title,
                 text: text,
                 dialogTitle: "Share invoice",
-                url: uri
+                files: [fileUri]
               });
               return true;
-            }catch(eUrl){}
+            }catch(eFiles){
+              try{ console.warn("orbit share files[]", eFiles); }catch(e2){}
+            }
           }
+          try{
+            await Share.share({
+              title: title,
+              text: text,
+              dialogTitle: "Share invoice",
+              url: fileUri
+            });
+            return true;
+          }catch(eUrl){
+            try{ console.warn("orbit share url", eUrl); }catch(e2){}
+          }
+          try{
+            await Share.share({
+              title: title,
+              text: text,
+              dialogTitle: "Share invoice",
+              files: [fileUri],
+              url: fileUri
+            });
+            return true;
+          }catch(eBoth){
+            try{ console.warn("orbit share both", eBoth); }catch(e2){}
+          }
+        } else if(lastErr){
+          try{ console.warn("orbit share write failed", lastErr); }catch(e2){}
         }
       }catch(eCap){
         try{ console.warn("orbit native share cap", eCap); }catch(e2){}

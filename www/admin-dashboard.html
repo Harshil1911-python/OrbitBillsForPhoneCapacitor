@@ -4715,14 +4715,37 @@ async function orbitSaveFile(blob, filename, opts){
         }
         if(written && opts.share !== false && Share && Share.share && savedPath){
           try{
+            // files[] required so WhatsApp/Drive get the CSV/Excel attachment
             await Share.share({
               title: opts.title || filename,
-              text: opts.text || "",
+              text: opts.text || ("Export from TechSerenia"),
               url: savedPath,
+              files: [savedPath],
               dialogTitle: opts.dialogTitle || "Save or share"
             });
             shared = true;
-          }catch(eShare){ console.warn("Share", eShare); }
+          }catch(eShare){
+            try{
+              await Share.share({
+                title: opts.title || filename,
+                text: opts.text || ("Export from TechSerenia"),
+                url: savedPath,
+                dialogTitle: opts.dialogTitle || "Save or share"
+              });
+              shared = true;
+            }catch(e2){ console.warn("Share", e2); }
+          }
+        }
+        // Also try unified helper (same path as invoice share)
+        if(!shared && opts.share !== false && window.__orbitNativeShare){
+          try{
+            shared = !!(await window.__orbitNativeShare({
+              blob: blob,
+              filename: filename,
+              title: opts.title || filename,
+              text: opts.text || "Export from TechSerenia"
+            }));
+          }catch(eH){}
         }
         if(written){
           return { ok: true, path: savedPath, shared: shared, native: true };
@@ -7147,5 +7170,6 @@ renderOverview();
   setTimeout(function(){ try{ document.documentElement.classList.remove("orbit-booting"); if(window.__orbitHideBoot) window.__orbitHideBoot(); }catch(e){} }, 1000);
 })();
 </script>
+<script src="orbit-assets.js"></script>
 </body>
 </html>

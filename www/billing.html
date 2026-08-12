@@ -661,10 +661,16 @@ th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
   #categoryFilter{
     flex:0 1 140px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px 10px;
   }
+  /* Cart bar already sits above bottom nav — do not add safe-area again (was causing a gap) */
   .m-cart-bar{
-    padding-top:8px!important;
-    padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;
+    padding:8px 10px!important;
     min-height:0!important;
+    bottom:calc(56px + env(safe-area-inset-bottom,0px))!important;
+    box-shadow:0 -4px 16px rgba(15,23,42,.2)!important;
+  }
+  .pos-bottom-nav{
+    height:calc(52px + env(safe-area-inset-bottom,0px))!important;
+    padding:2px 2px calc(2px + env(safe-area-inset-bottom,0px))!important;
   }
 }
 
@@ -1845,43 +1851,79 @@ function blobToBase64(blob){
 async function saveBlobToDevice(blob, filename, meta){
   const item = registerOrbitDownload(blob, filename, meta || {});
   const mime = (blob && blob.type) || (meta && meta.mime) || "application/octet-stream";
-  // 1) Capacitor Filesystem → Documents / Cache (then share)
+  const isImage = /^image\//i.test(mime) || /\.png$/i.test(filename) || /\.jpe?g$/i.test(filename);
+  const title = (meta && meta.title) || filename;
+  const text = (meta && meta.text) || "File from TechSerenia";
+
+  // 1) Capacitor: write to external Pictures (gallery-friendly) + Documents, then Share with files[]
   try{
     const Cap = window.Capacitor;
     const plugins = Cap && (Cap.Plugins || (Cap.Plugins = {}));
     const Filesystem = plugins && (plugins.Filesystem || window.Filesystem);
-    const Directory = (Filesystem && Filesystem.Directory) || (window.Directory) || null;
+    const Share = plugins && (plugins.Share || window.Share);
     if(Filesystem && Filesystem.writeFile){
       const b64 = await blobToBase64(blob);
-      const dir = (Directory && (Directory.Documents || Directory.DATA || Directory.Cache)) || "DOCUMENTS";
-      const path = "OrbitBills/" + filename;
-      await Filesystem.writeFile({ path: path, data: b64, directory: dir, recursive: true });
-      // Prefer Share plugin so user can Save to Gallery / WhatsApp
-      const Share = plugins.Share || window.Share;
-      if(Share && Share.share){
-        try{
-          const uriRes = Filesystem.getUri ? await Filesystem.getUri({ path: path, directory: dir }) : null;
-          const uri = uriRes && (uriRes.uri || uriRes);
-          if(uri){
-            await Share.share({ title: filename, text: "Invoice from OrbitBills", url: uri, dialogTitle: "Save or share invoice" });
-            try{ toast("Choose Save to Gallery or an app"); }catch(e){}
-            return item;
-          }
-        }catch(eShare){ console.warn("Cap Share", eShare); }
+      // Images: try public Pictures path first so Gallery apps can see them
+      const tryPaths = isImage
+        ? [
+            { path: "Pictures/TechSerenia/" + filename, dirs: ["EXTERNAL", "EXTERNAL_STORAGE"] },
+            { path: "DCIM/TechSerenia/" + filename, dirs: ["EXTERNAL", "EXTERNAL_STORAGE"] },
+            { path: "Download/TechSerenia/" + filename, dirs: ["EXTERNAL", "EXTERNAL_STORAGE", "DOCUMENTS"] },
+            { path: "TechSerenia/" + filename, dirs: ["DOCUMENTS", "CACHE", "DATA"] }
+          ]
+        : [
+            { path: "Download/TechSerenia/" + filename, dirs: ["EXTERNAL", "EXTERNAL_STORAGE", "DOCUMENTS"] },
+            { path: "TechSerenia/" + filename, dirs: ["DOCUMENTS", "CACHE", "DATA"] }
+          ];
+      let uri = null;
+      for(let t = 0; t < tryPaths.length && !uri; t++){
+        const dirs = tryPaths[t].dirs;
+        for(let d = 0; d < dirs.length && !uri; d++){
+          try{
+            await Filesystem.writeFile({ path: tryPaths[t].path, data: b64, directory: dirs[d], recursive: true });
+            const uriRes = Filesystem.getUri ? await Filesystem.getUri({ path: tryPaths[t].path, directory: dirs[d] }) : null;
+            uri = uriRes && (uriRes.uri || uriRes);
+          }catch(eDir){}
+        }
       }
-      try{ toast("Saved to device files"); }catch(e){}
-      return item;
+      if(Share && Share.share && uri){
+        try{
+          await Share.share({ title: title, text: text, files: [uri], url: uri, dialogTitle: "Save or share" });
+          try{ toast("Choose Gallery, WhatsApp, or Files"); }catch(e){}
+          return item;
+        }catch(eShare){
+          try{
+            await Share.share({ title: title, text: text, url: uri, dialogTitle: "Save or share" });
+            try{ toast("Choose Gallery, WhatsApp, or Files"); }catch(e){}
+            return item;
+          }catch(e2){ console.warn("Cap Share", e2); }
+        }
+      }
+      // Prefer unified helper
+      if(window.__orbitNativeShare){
+        try{
+          const ok = await window.__orbitNativeShare({ blob: blob, filename: filename, title: title, text: text });
+          if(ok){ try{ toast("Choose Gallery, WhatsApp, or Files"); }catch(e){} return item; }
+        }catch(e){}
+      }
+      if(uri){ try{ toast("Saved on device"); }catch(e){} return item; }
     }
   }catch(eCap){ console.warn("Capacitor save", eCap); }
 
-  // 2) Web Share API with file (Android: Save to Photos / WhatsApp / Drive)
+  // 2) Unified helper / Web Share with file
+  try{
+    if(window.__orbitNativeShare){
+      const ok = await window.__orbitNativeShare({ blob: blob, filename: filename, title: title, text: text });
+      if(ok) return item;
+    }
+  }catch(e){}
   try{
     if(navigator.share){
       let file = null;
       try{ file = new File([blob], filename, { type: mime }); }catch(e){ file = null; }
       if(file && (!navigator.canShare || navigator.canShare({ files: [file] }))){
         try{
-          await navigator.share({ files: [file], title: filename, text: "Invoice from OrbitBills" });
+          await navigator.share({ files: [file], title: title, text: text });
           try{ toast("Pick Gallery, WhatsApp, or Files"); }catch(e){}
           return item;
         }catch(eShareTry){
@@ -1894,7 +1936,7 @@ async function saveBlobToDevice(blob, filename, meta){
     console.warn("navigator.share", eShare2);
   }
 
-  // 3) Classic download (Downloads folder)
+  // 3) Classic download anchor
   try{
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -4725,54 +4767,78 @@ window.__calcOpen = false;
   }
 
   async function systemShareFile(it){
-    var title = "Invoice " + (it.invoiceNumber || "");
-    var textMsg = invoiceShareText(it);
+    var title = "Invoice " + (it.invoiceNumber || it.filename || "TechSerenia");
+    var textMsg = (typeof invoiceShareText === "function") ? invoiceShareText(it) : ("Invoice from TechSerenia");
     var file = await blobAsFile(it);
+    var blob = (file && file instanceof Blob) ? file : it.blob;
+    var filename = (it.filename || (file && file.name) || "invoice.bin");
 
-    // Capacitor Share + Filesystem
+    // 1) Unified native share helper (writes file + Share.files / navigator.share files)
+    try{
+      if(window.__orbitNativeShare && blob){
+        var okNat = await window.__orbitNativeShare({
+          blob: blob,
+          filename: filename,
+          title: title,
+          text: textMsg
+        });
+        if(okNat) return true;
+      }
+    }catch(eN){ console.warn("native share helper", eN); }
+
+    // 2) Capacitor Share + Filesystem with files: [uri] (required for WhatsApp attachment)
     try{
       var Cap = window.Capacitor;
       var plugins = Cap && Cap.Plugins;
       var Share = plugins && plugins.Share;
       var Filesystem = plugins && plugins.Filesystem;
-      if(Share && Share.share && Filesystem && Filesystem.writeFile){
+      if(Share && Share.share && Filesystem && Filesystem.writeFile && blob){
         var b64 = await new Promise(function(resolve, reject){
           var r = new FileReader();
           r.onload = function(){ var s=String(r.result||""); var i=s.indexOf(","); resolve(i>=0?s.slice(i+1):s); };
           r.onerror = reject;
-          r.readAsDataURL(it.blob);
+          r.readAsDataURL(blob);
         });
-        var path = "OrbitBills/" + (it.filename || "invoice.bin");
-        var dirs = ["CACHE", "DATA", "DOCUMENTS"];
-        var uri = null, usedDir = null;
+        var path = "TechSerenia/" + filename;
+        var dirs = ["CACHE", "DATA", "DOCUMENTS", "EXTERNAL", "EXTERNAL_STORAGE"];
+        var uri = null;
         for(var d = 0; d < dirs.length && !uri; d++){
           try{
             await Filesystem.writeFile({ path: path, data: b64, directory: dirs[d], recursive: true });
             var uriRes = await Filesystem.getUri({ path: path, directory: dirs[d] });
             uri = uriRes && (uriRes.uri || uriRes);
-            usedDir = dirs[d];
           }catch(eD){}
         }
         if(uri){
-          await Share.share({ title: title, text: textMsg, url: uri, dialogTitle: "Share invoice" });
-          return true;
+          try{
+            await Share.share({ title: title, text: textMsg, files: [uri], dialogTitle: "Share invoice" });
+            return true;
+          }catch(eF){
+            try{
+              await Share.share({ title: title, text: textMsg, url: uri, files: [uri], dialogTitle: "Share invoice" });
+              return true;
+            }catch(eF2){
+              await Share.share({ title: title, text: textMsg, url: uri, dialogTitle: "Share invoice" });
+              return true;
+            }
+          }
         }
       }
     }catch(eCap){ console.warn("cap share", eCap); }
 
-    // navigator.share with files
+    // 3) Web Share API with File attachment
     if(navigator.share){
       try{
         if(file && file instanceof File){
-          if(!navigator.canShare || navigator.canShare({ files: [file] })){
-            await navigator.share({ files: [file], title: title, text: textMsg });
+          var payload = { files: [file], title: title, text: textMsg };
+          if(!navigator.canShare || navigator.canShare(payload)){
+            await navigator.share(payload);
             return true;
           }
         }
       }catch(e1){
-        if(e1 && e1.name === "AbortError") return true; // user cancelled = ok
+        if(e1 && e1.name === "AbortError") return true;
       }
-      // Some WebViews accept share without canShare check
       try{
         if(file && file instanceof File){
           await navigator.share({ files: [file], title: title, text: textMsg });
@@ -4781,7 +4847,6 @@ window.__calcOpen = false;
       }catch(e2){
         if(e2 && e2.name === "AbortError") return true;
       }
-      // Text-only share as last web attempt
       try{
         await navigator.share({ title: title, text: textMsg });
         return true;

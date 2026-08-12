@@ -1,1 +1,48 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b3d91">
+<title>Billing · OrbitBills</title>
+<style>
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,sans-serif;background:#0b3d91;color:#fff}
+  .wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;box-sizing:border-box}
+  h1{font-size:20px;margin:0 0 8px;font-weight:700}
+  p{margin:0 0 16px;opacity:.9;font-size:14px;max-width:28ch;line-height:1.45}
+  a,button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 20px;border-radius:12px;border:0;background:#fff;color:#0b3d91;font-weight:700;font-size:15px;text-decoration:none;cursor:pointer;font-family:inherit}
+  .ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Opening Billing…</h1>
+  <p id="msg">Loading the latest billing page from OrbitBills.</p>
+  <a id="go" href="https://orbitbillsphone.onrender.com/billing.html">Open Billing</a>
+  <button type="button" class="ghost" id="retry">Retry</button>
+</div>
+<script>
+(function(){
+  var LIVE = "https://orbitbillsphone.onrender.com/billing.html";
+  var msg = document.getElementById("msg");
+  var go = document.getElementById("go");
+  go.href = LIVE + (location.search||"") + (location.hash||"");
+  function openLive(){
+    try {
+      window.location.replace(LIVE + (location.search||"") + (location.hash||""));
+    } catch(e) {
+      window.location.href = LIVE;
+    }
+  }
+  if (navigator.onLine !== false) {
+    openLive();
+    setTimeout(openLive, 400);
+  } else {
+    msg.textContent = "You are offline. Connect to the internet, then tap Open Billing.";
+  }
+  document.getElementById("retry").onclick = openLive;
+})();
+</script>
+<script src="orbit-native.js"></script>
+</body>
+</html>

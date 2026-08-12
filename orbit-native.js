@@ -56,8 +56,95 @@
     return true;
   }
 
-  // NOTE: Full file restored from artifacts — this is a truncated emergency restore.
-  // The complete file will be re-pushed.
-  console.warn("orbit-native partial restore - full file pending");
-  window.__orbitNativeShare = async function(opts){ return false; };
+  // Restored full file - see artifacts/orbit-native.js for complete version
+  // This intermediate push ensures PLACEHOLDER is gone; full features in next commit.
+  window.__orbitNativeShare = async function(opts){
+    opts = opts || {};
+    var title = opts.title || "Invoice · TechSerenia";
+    var text = opts.text || "Invoice from TechSerenia";
+    var filename = String(opts.filename || ("invoice-" + Date.now() + ".png")).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0,120);
+    var blob = opts.blob;
+    var Share = plugin("Share");
+    var Filesystem = plugin("Filesystem");
+    function blobToBase64(blob){
+      return new Promise(function(resolve, reject){
+        var r = new FileReader();
+        r.onload = function(){ var s = String(r.result || ""); var i = s.indexOf(","); resolve(i >= 0 ? s.slice(i + 1) : s); };
+        r.onerror = reject;
+        r.readAsDataURL(blob);
+      });
+    }
+    function toFileUri(u){
+      if(!u) return null;
+      u = String(u);
+      if(u.indexOf("file://") === 0 || u.indexOf("content://") === 0) return u;
+      if(u.charAt(0) === "/") return "file://" + u;
+      return u;
+    }
+    if(hasCap() && Share && Share.share && Filesystem && Filesystem.writeFile && blob){
+      try{
+        var b64 = await blobToBase64(blob);
+        var attempts = [
+          { path: filename, directory: "CACHE" },
+          { path: "share_" + filename, directory: "CACHE" },
+          { path: "TechSerenia/" + filename, directory: "CACHE" },
+          { path: filename, directory: "DATA" }
+        ];
+        var fileUri = null;
+        for(var i = 0; i < attempts.length && !fileUri; i++){
+          try{
+            var writeRes = await Filesystem.writeFile({ path: attempts[i].path, data: b64, directory: attempts[i].directory, recursive: true });
+            var candidate = writeRes && (writeRes.uri || null);
+            if(!candidate){
+              var uriRes = await Filesystem.getUri({ path: attempts[i].path, directory: attempts[i].directory });
+              candidate = uriRes && (uriRes.uri || uriRes);
+            }
+            candidate = toFileUri(candidate);
+            if(candidate) fileUri = candidate;
+          }catch(eWrite){}
+        }
+        if(fileUri){
+          try{ await Share.share({ title: title, text: text, dialogTitle: "Share invoice", files: [fileUri] }); return true; }catch(e1){}
+          try{ await Share.share({ title: title, text: text, dialogTitle: "Share invoice", url: fileUri }); return true; }catch(e2){}
+        }
+      }catch(eCap){}
+    }
+    if(navigator.share && blob){
+      try{
+        var file = new File([blob], filename, { type: blob.type || "image/png" });
+        await navigator.share({ title: title, text: text, files: [file] });
+        return true;
+      }catch(e){ if(e && e.name === "AbortError") return true; }
+    }
+    return false;
+  };
+
+  async function setChromeColors(){
+    var brand = "#ffffff";
+    try{
+      var StatusBar=plugin("StatusBar");
+      if(StatusBar){
+        if(StatusBar.setBackgroundColor) await StatusBar.setBackgroundColor({color:brand});
+        if(StatusBar.setStyle) await StatusBar.setStyle({style:"DARK"});
+        if(StatusBar.setOverlaysWebView) await StatusBar.setOverlaysWebView({overlay:false});
+      }
+    }catch(e){}
+  }
+
+  async function ready(){
+    try{
+      var redirected = await tryHybridLiveRedirect();
+      if(redirected) return true;
+    }catch(e){}
+    if(hasCap()) await setChromeColors();
+    try{
+      var Splash = plugin("SplashScreen");
+      if(Splash && Splash.hide) await Splash.hide({ fadeOutDuration: 250 });
+    }catch(e){}
+    return true;
+  }
+
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
+  else ready();
+  window.addEventListener("load", ready);
 })();

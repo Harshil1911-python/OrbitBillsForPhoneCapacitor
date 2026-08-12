@@ -151,7 +151,6 @@
     try{ sessionStorage.setItem("orbit_offline_modal_dismissed","1"); }catch(e){}
   }
 
-  /* ========== Local Notifications (system tray like WhatsApp / Instagram) ========== */
   var NOTIF_CHANNEL_ID = "orbitbills_alerts";
   var _notifReady = false;
 
@@ -273,10 +272,6 @@
     return u;
   }
 
-  /**
-   * Share PNG/PDF via Android system share sheet (WhatsApp, Drive, etc.).
-   * Capacitor Share requires file:// URLs in files[]; CACHE is allowed by default FileProvider.
-   */
   window.__orbitNativeShare = async function(opts){
     opts = opts || {};
     var title = opts.title || "Invoice · TechSerenia";
@@ -559,6 +554,51 @@
       });
     }
   }
+
+  /* Pay & Print / Pay Later / Create → open share sheet with invoice file pre-attached */
+  function orbitBindPostSaleShareButtons(){
+    ["btnPayPrint","plConfirm","createInvoiceBtn"].forEach(function(id){
+      var el = document.getElementById(id);
+      if(!el || el.dataset.orbitShareBound2 === "1") return;
+      el.dataset.orbitShareBound2 = "1";
+      el.addEventListener("click", function(){
+        var before = window.lastInvoiceId;
+        var n = 0;
+        var iv = setInterval(function(){
+          n++;
+          try{
+            if(window.lastInvoiceId && window.lastInvoiceId !== before && window.lastInvoicePayload){
+              clearInterval(iv);
+              setTimeout(function(){
+                try{
+                  if(typeof window.prepareAndOpenInvoiceShare === "function"){
+                    window.prepareAndOpenInvoiceShare("png");
+                  } else if(typeof window.__orbitNativeShare === "function" && window.__orbitDownloads && window.__orbitDownloads.length){
+                    var it = window.__orbitDownloads[0];
+                    if(it && it.blob){
+                      window.__orbitNativeShare({
+                        blob: it.blob,
+                        filename: it.filename,
+                        title: "Invoice " + (it.invoiceNumber || ""),
+                        text: "Invoice from TechSerenia"
+                      });
+                    }
+                  }
+                }catch(e){ try{ console.warn("orbit post-sale share", e); }catch(e2){} }
+              }, 280);
+            }
+          }catch(e){}
+          if(n > 50) clearInterval(iv);
+        }, 150);
+      });
+    });
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", orbitBindPostSaleShareButtons);
+  else orbitBindPostSaleShareButtons();
+  window.addEventListener("load", orbitBindPostSaleShareButtons);
+  setTimeout(orbitBindPostSaleShareButtons, 400);
+  setTimeout(orbitBindPostSaleShareButtons, 1200);
+  setTimeout(orbitBindPostSaleShareButtons, 3000);
 
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
   else ready();

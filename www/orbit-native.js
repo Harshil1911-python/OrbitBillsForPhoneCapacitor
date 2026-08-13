@@ -10,7 +10,7 @@
   }
 
   var LIVE_URL = "https://orbitbillsphone.onrender.com";
-  var PREFER_LIVE = true;
+  var PREFER_LIVE = false;
   var SYNC_PATH = "OrbitBills/orbit-sync-backup.json";
   var _syncBusy = false;
   var _lastOnline = null;
@@ -40,9 +40,12 @@
   function currentAppPath(){
     try{
       var p = location.pathname || "/";
-      if(!p || p === "/") p = "/index.html";
-      if(p.indexOf("http") === 0) p = "/index.html";
-      return p + (location.search || "") + (location.hash || "");
+      var parts = p.split("/").filter(Boolean);
+      var file = parts.length ? parts[parts.length - 1] : "index.html";
+      if(!/\.html$/i.test(file)) file = "index.html";
+      var allowed = {"billing.html":1,"admin-dashboard.html":1,"accountant-dashboard.html":1,"signin.html":1,"index.html":1,"home.html":1,"offline.html":1};
+      if(!allowed[file]) file = "index.html";
+      return "/" + file;
     }catch(e){ return "/index.html"; }
   }
   function waitForDb(maxMs){
@@ -56,15 +59,29 @@
       })();
     });
   }
+  function showSwitchOverlay(msg){
+    try{
+      var el = document.getElementById("orbitSwitchOverlay");
+      if(!el){
+        el = document.createElement("div");
+        el.id = "orbitSwitchOverlay";
+        el.style.cssText = "position:fixed;inset:0;z-index:200000;background:#0b3d91;color:#fff;display:flex;align-items:center;justify-content:center;font:600 15px system-ui,sans-serif;padding:24px;text-align:center;";
+        el.innerHTML = "<div id=\"orbitSwitchMsg\"></div>";
+        (document.body||document.documentElement).appendChild(el);
+      }
+      var m = document.getElementById("orbitSwitchMsg");
+      if(m) m.textContent = msg || "Switching to offline mode...";
+      el.style.display = "flex";
+    }catch(e){}
+  }
   async function writeSyncBackup(payload){
     var Filesystem = plugin("Filesystem");
     if(!Filesystem || !Filesystem.writeFile) return false;
     try{
       var json = JSON.stringify(payload);
       await Filesystem.writeFile({ path: SYNC_PATH, data: btoa(unescape(encodeURIComponent(json))), directory: "DATA", recursive: true });
-      try{ sessionStorage.setItem("orbit_sync_written_at", payload.exportedAt || new Date().toISOString()); }catch(e){}
       return true;
-    }catch(e){ try{ console.warn("orbit sync write", e); }catch(e2){} return false; }
+    }catch(e){ return false; }
   }
   async function readSyncBackup(){
     var Filesystem = plugin("Filesystem");
@@ -89,7 +106,7 @@
       payload.syncSource = isOnLiveHost() ? "live" : "local";
       payload.syncPath = currentAppPath();
       return await writeSyncBackup(payload);
-    }catch(e){ try{ console.warn("orbit export sync", e); }catch(e2){} return false; }
+    }catch(e){ return false; }
     finally{ _syncBusy = false; }
   }
   async function importDbFromNative(opts){
@@ -100,21 +117,22 @@
       if(!(await waitForDb(4000))) return false;
       var payload = await readSyncBackup();
       if(!payload || !payload.stores) return false;
-      try{ var applied = sessionStorage.getItem("orbit_sync_applied_at"); if(applied && payload.exportedAt && applied === payload.exportedAt) return false; }catch(e){}
-      var shouldRestore = true;
+      try{ var applied = localStorage.getItem("orbit_sync_applied_at"); if(applied && payload.exportedAt && applied === payload.exportedAt) return false; }catch(e){}
+      var mode = "merge";
       try{
-        if(typeof window.tsGetSetting === "function"){
-          var localExport = await window.tsGetSetting("orbit_last_export_at", "");
-          if(localExport && payload.exportedAt && String(localExport) > String(payload.exportedAt)) shouldRestore = false;
+        if(opts.force) mode = "replace";
+        else if(typeof window.tsCount === "function"){
+          var ic = await window.tsCount("invoices");
+          var pc = await window.tsCount("products");
+          if((ic||0)===0 && (pc||0)===0) mode = "replace";
         }
       }catch(e){}
-      if(!shouldRestore && !opts.force) return false;
-      await window.tsRestoreBackupPayload(payload, { mode: opts.merge ? "merge" : "replace" });
+      await window.tsRestoreBackupPayload(payload, { mode: mode });
       try{ if(typeof window.tsSetSetting === "function" && payload.exportedAt) await window.tsSetSetting("orbit_last_export_at", payload.exportedAt); }catch(e){}
-      try{ sessionStorage.setItem("orbit_sync_applied_at", payload.exportedAt || ""); }catch(e){}
+      try{ localStorage.setItem("orbit_sync_applied_at", payload.exportedAt || ""); }catch(e){}
       try{ window.dispatchEvent(new CustomEvent("orbitbills-sync", { detail: { type: "restore", from: "native-sync" } })); }catch(e){}
       return true;
-    }catch(e){ try{ console.warn("orbit import sync", e); }catch(e2){} return false; }
+    }catch(e){ return false; }
     finally{ _syncBusy = false; }
   }
   window.__orbitExportSync = exportDbToNative;
@@ -122,9 +140,11 @@
 
   async function switchToOfflineLocal(){
     if(!hasCap() || !isOnLiveHost()) return false;
+    try{ showSwitchOverlay("Saving data and switching to offline..."); }catch(e){}
     try{ sessionStorage.setItem("orbit_skip_live_redirect", "1"); }catch(e){}
     try{ sessionStorage.removeItem("orbit_live_redirected"); }catch(e){}
     try{ await exportDbToNative(); }catch(e){}
+    await new Promise(function(r){ setTimeout(r, 150); });
     var target = localBaseUrl().replace(/\/$/, "") + currentAppPath();
     try{ window.location.replace(target); }catch(e){ try{ window.location.href = target; }catch(e2){} }
     return true;
@@ -140,7 +160,7 @@
     if(!online) return false;
     try{ await exportDbToNative(); }catch(e){}
     try{ sessionStorage.setItem("orbit_live_redirected","1"); }catch(e){}
-    try{ window.location.replace(LIVE_URL.replace(/\/$/,"") + (location.pathname && location.pathname !== "/" ? location.pathname : "/index.html") + (location.search||"") + (location.hash||"")); }
+    try{ window.location.replace(LIVE_URL.replace(/\/$/,"") + currentAppPath()); }
     catch(e){ try{ window.location.href = LIVE_URL; }catch(e2){} }
     return true;
   }
@@ -148,8 +168,6 @@
   async function setChromeColors(){
     var brand = "#ffffff";
     try{ var StatusBar=plugin("StatusBar"); if(StatusBar){ if(StatusBar.setBackgroundColor) await StatusBar.setBackgroundColor({color:brand}); if(StatusBar.setStyle) await StatusBar.setStyle({style:"DARK"}); if(StatusBar.setOverlaysWebView) await StatusBar.setOverlaysWebView({overlay:false}); } }catch(e){}
-    try{ var Nav = plugin("NavigationBar") || plugin("EdgeToEdge") || plugin("AndroidNavigationBar"); if(Nav){ if(Nav.setColor) await Nav.setColor({ color: brand, darkButtons: true }); else if(Nav.setBackgroundColor) await Nav.setBackgroundColor({ color: brand }); else if(Nav.setNavigationBarColor) await Nav.setNavigationBarColor({ color: brand }); } }catch(e){}
-    try{ var E = plugin("EdgeToEdge"); if(E && E.setBackgroundColor) await E.setBackgroundColor({ color: brand }); }catch(e){}
     try{ var meta = document.querySelector('meta[name="theme-color"]'); if(meta) meta.setAttribute("content", brand); else { meta = document.createElement("meta"); meta.name = "theme-color"; meta.content = brand; document.head.appendChild(meta); } ensureNavFill(brand); }catch(e){}
   }
   function ensureNavFill(brand){
@@ -164,16 +182,14 @@
     if(document.getElementById("orbitOfflineModal")) return;
     var wrap = document.createElement("div");
     wrap.id = "orbitOfflineModal"; wrap.setAttribute("aria-hidden","true");
-    wrap.style.cssText = "display:none;position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.45);align-items:center;justify-content:center;padding:20px;padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(20px,env(safe-area-inset-bottom));box-sizing:border-box;";
-    wrap.innerHTML = '<div role="dialog" aria-labelledby="orbitOffTitle" style="width:100%;max-width:340px;background:#fff;border-radius:16px;padding:22px 18px 16px;box-shadow:0 20px 50px rgba(15,23,42,.25);font-family:system-ui,-apple-system,sans-serif;"><div style="width:44px;height:44px;border-radius:12px;background:#fef2f2;display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:22px;">📡</div><h3 id="orbitOffTitle" style="margin:0 0 8px;font-size:17px;font-weight:700;color:#101a2b;">You are offline</h3><p style="margin:0 0 14px;font-size:14px;line-height:1.45;color:#5b6b82;">Switched to offline mode. Your data stays on this device and will sync when you are back online.</p><div id="orbitOffLearn" style="display:none;margin:0 0 14px;padding:12px;border-radius:12px;background:#f5f8fe;border:1px solid #dfe7f5;font-size:13.5px;line-height:1.45;color:#101a2b;"><strong style="display:block;margin-bottom:4px;">Offline & online stay in sync</strong>Bills, products, and stock are saved in IndexedDB on this phone. When the network drops, the app switches to the offline package automatically (no reopen needed). When you go online again, data is synced both ways.</div><button type="button" id="orbitOffLearnBtn" style="width:100%;margin-bottom:8px;border:1px solid #dfe7f5;background:#fff;color:#0b3d91;font-weight:700;font-size:14px;border-radius:11px;cursor:pointer;font-family:inherit;min-height:44px;">Learn more</button><button type="button" id="orbitOffOk" style="width:100%;min-height:44px;border:0;background:#0b3d91;color:#fff;font-weight:700;font-size:14px;border-radius:11px;cursor:pointer;font-family:inherit;">OK</button></div>';
+    wrap.style.cssText = "display:none;position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.45);align-items:center;justify-content:center;padding:20px;box-sizing:border-box;";
+    wrap.innerHTML = '<div role="dialog" style="width:100%;max-width:340px;background:#fff;border-radius:16px;padding:22px 18px 16px;box-shadow:0 20px 50px rgba(15,23,42,.25);font-family:system-ui,sans-serif;"><div style="font-size:22px;margin-bottom:12px;">📡</div><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#101a2b;">You are offline</h3><p style="margin:0 0 14px;font-size:14px;line-height:1.45;color:#5b6b82;">Keep billing as usual. All data is saved on this phone.</p><button type="button" id="orbitOffOk" style="width:100%;min-height:44px;border:0;background:#0b3d91;color:#fff;font-weight:700;font-size:14px;border-radius:11px;cursor:pointer;">OK</button></div>';
     (document.body||document.documentElement).appendChild(wrap);
     wrap.addEventListener("click", function(e){ if(e.target === wrap) hideOfflineModal(); });
-    var learnBtn = document.getElementById("orbitOffLearnBtn"); var learnBox = document.getElementById("orbitOffLearn");
-    if(learnBtn && learnBox){ learnBtn.addEventListener("click", function(){ var open = learnBox.style.display === "block"; learnBox.style.display = open ? "none" : "block"; learnBtn.textContent = open ? "Learn more" : "Hide details"; }); }
     var ok = document.getElementById("orbitOffOk"); if(ok) ok.addEventListener("click", hideOfflineModal);
   }
-  function showOfflineModal(){ try{ if(sessionStorage.getItem("orbit_offline_modal_dismissed") === "1") return; }catch(e){} ensureOfflineModal(); var wrap = document.getElementById("orbitOfflineModal"); if(wrap){ wrap.style.display = "flex"; wrap.setAttribute("aria-hidden","false"); } }
-  function hideOfflineModal(){ var wrap = document.getElementById("orbitOfflineModal"); if(wrap){ wrap.style.display = "none"; wrap.setAttribute("aria-hidden","true"); } try{ sessionStorage.setItem("orbit_offline_modal_dismissed","1"); }catch(e){} }
+  function showOfflineModal(){ try{ if(sessionStorage.getItem("orbit_offline_modal_dismissed") === "1") return; }catch(e){} ensureOfflineModal(); var wrap = document.getElementById("orbitOfflineModal"); if(wrap){ wrap.style.display = "flex"; } }
+  function hideOfflineModal(){ var wrap = document.getElementById("orbitOfflineModal"); if(wrap){ wrap.style.display = "none"; } try{ sessionStorage.setItem("orbit_offline_modal_dismissed","1"); }catch(e){} }
 
   var NOTIF_CHANNEL_ID = "orbitbills_alerts"; var _notifReady = false;
   async function ensureNotifChannel(){
@@ -190,7 +206,7 @@
       if(!hasCap()){ if(typeof Notification !== "undefined"){ if(Notification.permission === "default") await Notification.requestPermission(); if(Notification.permission === "granted"){ new Notification(title, { body: body, icon: "logo.png", tag: "orbit-"+id }); return true; } } return false; }
       var LN = plugin("LocalNotifications"); if(!LN || !LN.schedule) return false; if(!_notifReady) await ensureNotifChannel();
       await LN.schedule({ notifications: [{ id: id, title: title, body: body, channelId: NOTIF_CHANNEL_ID, sound: "default", schedule: { at: new Date(Date.now() + 200) }, extra: opts.extra || {} }] }); return true;
-    }catch(e){ try{ console.warn("orbit notify", e); }catch(e2){} return false; }
+    }catch(e){ return false; }
   };
   window.__orbitNotifyInvoice = function(invNo, totalText){ var n = invNo || "Invoice"; var t = totalText || ""; return window.__orbitNotify({ title: "Bill created · " + n, body: t ? ("Total " + t + " · OrbitBills") : "Invoice saved on this device", id: Math.abs(String(n).split("").reduce(function(a,c){ return ((a<<5)-a)+c.charCodeAt(0)|0; },0)) % 900000 + 100 }); };
   window.__orbitNotifyLowStock = function(names){ var list = Array.isArray(names) ? names.filter(Boolean) : [names]; if(!list.length) return Promise.resolve(false); var body = list.slice(0, 4).join(", "); if(list.length > 4) body += " +" + (list.length - 4) + " more"; return window.__orbitNotify({ title: "Low stock alert", body: body, id: 42001 }); };
@@ -202,13 +218,13 @@
     if(hasCap() && Share && Share.share && Filesystem && Filesystem.writeFile && blob){
       try{
         var b64 = await blobToBase64(blob);
-        var attempts = [{ path: "TechSerenia/" + filename, directory: "CACHE" }, { path: "TechSerenia/" + filename, directory: "DATA" }, { path: "share/" + filename, directory: "CACHE" }, { path: filename, directory: "CACHE" }];
+        var attempts = [{ path: "TechSerenia/" + filename, directory: "CACHE" }, { path: "TechSerenia/" + filename, directory: "DATA" }, { path: filename, directory: "CACHE" }];
         var uri = null;
         for(var i = 0; i < attempts.length && !uri; i++){
           try{ await Filesystem.writeFile({ path: attempts[i].path, data: b64, directory: attempts[i].directory, recursive: true }); var uriRes = await Filesystem.getUri({ path: attempts[i].path, directory: attempts[i].directory }); uri = uriRes && (uriRes.uri || uriRes); }catch(eWrite){}
         }
         if(uri){ try{ await Share.share({ title: title, text: text, dialogTitle: "Share invoice", files: [uri], url: uri }); return true; }catch(eFiles){ try{ await Share.share({ title: title, text: text, dialogTitle: "Share invoice", url: uri }); return true; }catch(eUrl){} } }
-      }catch(eCap){ try{ console.warn("orbit native share cap", eCap); }catch(e2){} }
+      }catch(eCap){}
     }
     if(navigator.share && blob && filename){ try{ var file = new File([blob], filename, { type: blob.type || (/\.pdf$/i.test(filename) ? "application/pdf" : "image/png") }); var data = { title: title, text: text, files: [file] }; if(navigator.canShare && !navigator.canShare(data)){ await navigator.share({ title: title, text: text }); return true; } await navigator.share(data); return true; }catch(e){ if(e && e.name === "AbortError") return true; } }
     if(navigator.share){ try{ await navigator.share({ title: title, text: text, url: opts.url }); return true; }catch(e){ if(e && e.name === "AbortError") return true; } }
@@ -218,8 +234,9 @@
   window.__orbitPlaySuccessTone = function(){ try{ if(typeof window.playInvoiceSuccessSound === "function"){ window.playInvoiceSuccessSound(); return; } var Ctx = window.AudioContext || window.webkitAudioContext; if(!Ctx) return; var ctx = window.__orbitToneCtx || (window.__orbitToneCtx = new Ctx()); if(ctx.state === "suspended") ctx.resume(); var now = ctx.currentTime; function tone(freq, start, dur, gain){ var o = ctx.createOscillator(); var g = ctx.createGain(); o.type = "sine"; o.frequency.value = freq; g.gain.setValueAtTime(0.0001, start); g.gain.exponentialRampToValueAtTime(gain, start + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, start + dur); o.connect(g); g.connect(ctx.destination); o.start(start); o.stop(start + dur + 0.02); } tone(880, now, 0.12, 0.09); tone(1174.66, now + 0.09, 0.16, 0.07); }catch(e){} };
 
   async function ready(){
+    try{ if(hasCap() && isOnLiveHost() && !navigator.onLine){ await switchToOfflineLocal(); return true; } }catch(e){}
     try{ if(await tryHybridLiveRedirect()) return true; }catch(e){}
-    try{ if(hasCap()) setTimeout(function(){ importDbFromNative({ merge: false }); }, 600); }catch(e){}
+    try{ if(hasCap() && isLocalCapOrigin()) setTimeout(function(){ importDbFromNative({}); }, 600); }catch(e){}
     if(!hasCap()){ setupNetwork(); setupBackButton(); try{ ensureNavFill("#ffffff"); }catch(e){} return false; }
     await setChromeColors();
     try{ var Splash = plugin("SplashScreen"); if(Splash && Splash.hide) await Splash.hide({ fadeOutDuration: 250 }); }catch(e){}
@@ -227,6 +244,7 @@
     setupNetwork(); setupBackButton();
     try{ await ensureNotifChannel(); }catch(e){}
     try{ if(/billing\.html/i.test(location.pathname || "") && navigator.wakeLock && navigator.wakeLock.request){ try{ window.__orbitWake = await navigator.wakeLock.request("screen"); }catch(e){} } }catch(e){}
+    try{ if(hasCap() && isLocalCapOrigin()) setInterval(function(){ exportDbToNative(); }, 60000); }catch(e){}
     return true;
   }
 
@@ -236,9 +254,9 @@
     if(!bar){
       bar = document.createElement("div"); bar.id = "orbitOfflineBanner";
       bar.style.cssText = "display:none;position:fixed;left:0;right:0;top:0;z-index:99999;background:#b91c1c;color:#fff;font:600 13px/1.3 system-ui,sans-serif;padding:8px 40px 8px 12px;padding-top:max(8px,env(safe-area-inset-top));text-align:center;box-sizing:border-box;";
-      var msg = document.createElement("span"); msg.id = "orbitOfflineBannerText"; msg.textContent = "You are offline — data stays on this device"; bar.appendChild(msg);
-      var x = document.createElement("button"); x.type = "button"; x.id = "orbitOfflineBannerClose"; x.setAttribute("aria-label", "Dismiss offline notice"); x.textContent = "×";
-      x.style.cssText = "position:absolute;right:8px;top:50%;transform:translateY(-50%);margin-top:max(0px,env(safe-area-inset-top)/2);width:32px;height:32px;border:0;background:transparent;color:#fff;font:700 22px/1 system-ui,sans-serif;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;";
+      var msg = document.createElement("span"); msg.id = "orbitOfflineBannerText"; msg.textContent = "You are offline - data stays on this device"; bar.appendChild(msg);
+      var x = document.createElement("button"); x.type = "button"; x.id = "orbitOfflineBannerClose"; x.setAttribute("aria-label", "Dismiss"); x.textContent = "\u00d7";
+      x.style.cssText = "position:absolute;right:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:0;background:transparent;color:#fff;font:700 22px/1 system-ui,sans-serif;cursor:pointer;";
       x.addEventListener("click", function(e){ try{ e.preventDefault(); e.stopPropagation(); }catch(err){} try{ sessionStorage.setItem("orbit_offline_banner_dismissed", "1"); }catch(err){} bar.style.display = "none"; bar.setAttribute("data-dismissed", "1"); });
       bar.appendChild(x); (document.body || document.documentElement).appendChild(bar);
     }
@@ -247,12 +265,7 @@
       if(_lastOnline === ok) return; _lastOnline = ok;
       if(ok){
         bar.style.display = "none"; try{ sessionStorage.removeItem("orbit_offline_banner_dismissed"); }catch(e){} bar.removeAttribute("data-dismissed");
-        try{ sessionStorage.removeItem("orbit_skip_live_redirect"); }catch(e){}
-        try{
-          if(hasCap() && PREFER_LIVE && !isOnLiveHost() && (isLocalCapOrigin() || location.protocol === "file:")){
-            if(sessionStorage.getItem("orbit_live_redirected") !== "1"){ exportDbToNative().then(function(){ tryHybridLiveRedirect(); }); }
-          } else if(hasCap() && isOnLiveHost()){ importDbFromNative({ merge: false }); }
-        }catch(e){}
+        try{ if(hasCap() && isLocalCapOrigin()) exportDbToNative(); }catch(e){}
         return;
       }
       if(isDismissed()) bar.style.display = "none"; else bar.style.display = "block";
@@ -265,8 +278,6 @@
       if(Network.addListener) Network.addListener("networkStatusChange", function(s){ setOnline(!!s.connected); });
     } else {
       setOnline(navigator.onLine);
-      window.addEventListener("online", function(){ setOnline(true); });
-      window.addEventListener("offline", function(){ setOnline(false); });
     }
     try{ window.addEventListener("online", function(){ setOnline(true); }); window.addEventListener("offline", function(){ setOnline(false); }); }catch(e){}
   }

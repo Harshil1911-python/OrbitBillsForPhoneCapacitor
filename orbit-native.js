@@ -13,6 +13,9 @@
   // Keep LIVE_URL in sync with app-config.json websiteUrl.
   var LIVE_URL = "https://orbitbillsphone.onrender.com";
   var PREFER_LIVE = true;
+  var SYNC_PATH = "OrbitBills/orbit-sync-backup.json";
+  var _syncBusy = false;
+  var _lastOnline = null;
 
   function isOnLiveHost(){
     try{
@@ -31,6 +34,164 @@
     }catch(e){ return false; }
   }
 
+  function localBaseUrl(){
+    try{
+      if(location.protocol === "capacitor:" || location.protocol === "ionic:"){
+        return location.protocol + "//localhost";
+      }
+    }catch(e){}
+    return "https://localhost";
+  }
+
+  function currentAppPath(){
+    try{
+      var p = location.pathname || "/";
+      if(!p || p === "/") p = "/index.html";
+      if(p.indexOf("http") === 0) p = "/index.html";
+      return p + (location.search || "") + (location.hash || "");
+    }catch(e){ return "/index.html"; }
+  }
+
+  function waitForDb(maxMs){
+    maxMs = maxMs || 4000;
+    return new Promise(function(resolve){
+      var start = Date.now();
+      (function tick(){
+        if(typeof window.tsBuildBackupPayload === "function" && typeof window.tsRestoreBackupPayload === "function"){
+          resolve(true); return;
+        }
+        if(Date.now() - start > maxMs){ resolve(false); return; }
+        setTimeout(tick, 80);
+      })();
+    });
+  }
+
+  async function writeSyncBackup(payload){
+    var Filesystem = plugin("Filesystem");
+    if(!Filesystem || !Filesystem.writeFile) return false;
+    try{
+      var json = JSON.stringify(payload);
+      await Filesystem.writeFile({
+        path: SYNC_PATH,
+        data: btoa(unescape(encodeURIComponent(json))),
+        directory: "DATA",
+        recursive: true
+      });
+      try{ sessionStorage.setItem("orbit_sync_written_at", payload.exportedAt || new Date().toISOString()); }catch(e){}
+      return true;
+    }catch(e){
+      try{ console.warn("orbit sync write", e); }catch(e2){}
+      return false;
+    }
+  }
+
+  async function readSyncBackup(){
+    var Filesystem = plugin("Filesystem");
+    if(!Filesystem || !Filesystem.readFile) return null;
+    try{
+      var res = await Filesystem.readFile({ path: SYNC_PATH, directory: "DATA" });
+      var raw = res && res.data;
+      if(!raw) return null;
+      var text;
+      try{
+        text = decodeURIComponent(escape(atob(raw)));
+      }catch(e1){
+        try{ text = atob(raw); }catch(e2){ text = String(raw); }
+      }
+      var payload = JSON.parse(text);
+      if(!payload || payload.format !== "orbitbills-local-backup") return null;
+      return payload;
+    }catch(e){
+      return null;
+    }
+  }
+
+  async function exportDbToNative(){
+    if(!hasCap()) return false;
+    if(_syncBusy) return false;
+    _syncBusy = true;
+    try{
+      var ready = await waitForDb(3000);
+      if(!ready) return false;
+      var payload = await window.tsBuildBackupPayload();
+      if(!payload) return false;
+      payload.syncSource = isOnLiveHost() ? "live" : "local";
+      payload.syncPath = currentAppPath();
+      return await writeSyncBackup(payload);
+    }catch(e){
+      try{ console.warn("orbit export sync", e); }catch(e2){}
+      return false;
+    }finally{
+      _syncBusy = false;
+    }
+  }
+
+  async function importDbFromNative(opts){
+    opts = opts || {};
+    if(!hasCap()) return false;
+    if(_syncBusy) return false;
+    _syncBusy = true;
+    try{
+      var ready = await waitForDb(4000);
+      if(!ready) return false;
+      var payload = await readSyncBackup();
+      if(!payload || !payload.stores) return false;
+
+      try{
+        var applied = sessionStorage.getItem("orbit_sync_applied_at");
+        if(applied && payload.exportedAt && applied === payload.exportedAt) return false;
+      }catch(e){}
+
+      var shouldRestore = true;
+      try{
+        if(typeof window.tsGetSetting === "function"){
+          var localExport = await window.tsGetSetting("orbit_last_export_at", "");
+          if(localExport && payload.exportedAt && String(localExport) > String(payload.exportedAt)){
+            shouldRestore = false;
+          }
+        }
+      }catch(e){}
+
+      if(!shouldRestore && !opts.force) return false;
+
+      await window.tsRestoreBackupPayload(payload, { mode: opts.merge ? "merge" : "replace" });
+      try{
+        if(typeof window.tsSetSetting === "function" && payload.exportedAt){
+          await window.tsSetSetting("orbit_last_export_at", payload.exportedAt);
+        }
+      }catch(e){}
+      try{ sessionStorage.setItem("orbit_sync_applied_at", payload.exportedAt || ""); }catch(e){}
+      try{
+        window.dispatchEvent(new CustomEvent("orbitbills-sync", { detail: { type: "restore", from: "native-sync" } }));
+      }catch(e){}
+      return true;
+    }catch(e){
+      try{ console.warn("orbit import sync", e); }catch(e2){}
+      return false;
+    }finally{
+      _syncBusy = false;
+    }
+  }
+
+  window.__orbitExportSync = exportDbToNative;
+  window.__orbitImportSync = importDbFromNative;
+
+  async function switchToOfflineLocal(){
+    if(!hasCap()) return false;
+    if(!isOnLiveHost()) return false;
+    try{ sessionStorage.setItem("orbit_skip_live_redirect", "1"); }catch(e){}
+    try{ sessionStorage.removeItem("orbit_live_redirected"); }catch(e){}
+    try{ await exportDbToNative(); }catch(e){}
+    var path = currentAppPath();
+    var target = localBaseUrl().replace(/\/$/, "") + path;
+    try{
+      window.location.replace(target);
+    }catch(e){
+      try{ window.location.href = target; }catch(e2){}
+    }
+    return true;
+  }
+
   async function tryHybridLiveRedirect(){
     if(!hasCap() || !PREFER_LIVE) return false;
     if(isOnLiveHost()) return false;
@@ -47,6 +208,7 @@
       }
     }catch(e){}
     if(!online) return false;
+    try{ await exportDbToNative(); }catch(e){}
     try{ sessionStorage.setItem("orbit_live_redirected","1"); }catch(e){}
     try{
       window.location.replace(LIVE_URL.replace(/\/$/,"") + (location.pathname && location.pathname !== "/" ? location.pathname : "/index.html") + (location.search||"") + (location.hash||""));
@@ -109,10 +271,10 @@
       + '<div role="dialog" aria-labelledby="orbitOffTitle" style="width:100%;max-width:340px;background:#fff;border-radius:16px;padding:22px 18px 16px;box-shadow:0 20px 50px rgba(15,23,42,.25);font-family:system-ui,-apple-system,sans-serif;">'
       +   '<div style="width:44px;height:44px;border-radius:12px;background:#fef2f2;display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:22px;">📡</div>'
       +   '<h3 id="orbitOffTitle" style="margin:0 0 8px;font-size:17px;font-weight:700;color:#101a2b;">You are offline</h3>'
-      +   '<p style="margin:0 0 14px;font-size:14px;line-height:1.45;color:#5b6b82;">Data stays on this device. You can keep billing and working as usual.</p>'
+      +   '<p style="margin:0 0 14px;font-size:14px;line-height:1.45;color:#5b6b82;">Switched to offline mode. Your data stays on this device and will sync when you are back online.</p>'
       +   '<div id="orbitOffLearn" style="display:none;margin:0 0 14px;padding:12px;border-radius:12px;background:#f5f8fe;border:1px solid #dfe7f5;font-size:13.5px;line-height:1.45;color:#101a2b;">'
-      +     '<strong style="display:block;margin-bottom:4px;">Latest features may not work in offline mode</strong>'
-      +     'When your phone is offline the app uses the pages stored inside it. New updates from the website appear automatically the next time you open the app while online.'
+      +     '<strong style="display:block;margin-bottom:4px;">Offline & online stay in sync</strong>'
+      +     'Bills, products, and stock are saved in IndexedDB on this phone. When the network drops, the app switches to the offline package automatically (no reopen needed). When you go online again, data is synced both ways.'
       +   '</div>'
       +   '<button type="button" id="orbitOffLearnBtn" style="width:100%;margin-bottom:8px;border:1px solid #dfe7f5;background:#fff;color:#0b3d91;font-weight:700;font-size:14px;border-radius:11px;cursor:pointer;font-family:inherit;min-height:44px;">Learn more</button>'
       +   '<button type="button" id="orbitOffOk" style="width:100%;min-height:44px;border:0;background:#0b3d91;color:#fff;font-weight:700;font-size:14px;border-radius:11px;cursor:pointer;font-family:inherit;">OK</button>'
@@ -151,7 +313,6 @@
     try{ sessionStorage.setItem("orbit_offline_modal_dismissed","1"); }catch(e){}
   }
 
-  /* ========== Local Notifications (system tray like WhatsApp / Instagram) ========== */
   var NOTIF_CHANNEL_ID = "orbitbills_alerts";
   var _notifReady = false;
 
@@ -255,11 +416,6 @@
     });
   }
 
-  /**
-   * Share a file (PNG/PDF) via Android system share sheet so WhatsApp, Drive, etc. receive the attachment.
-   * FIX: write to CACHE/DATA via Filesystem, then Share.share({ files: [uri] }).
-   * This restores the "Sharing image / File from TechSerenia" sheet in the Capacitor APK.
-   */
   window.__orbitNativeShare = async function(opts){
     opts = opts || {};
     var title = opts.title || "Invoice · TechSerenia";
@@ -396,6 +552,12 @@
       if(redirected) return true;
     }catch(e){}
 
+    try{
+      if(hasCap()){
+        setTimeout(function(){ importDbFromNative({ merge: false }); }, 600);
+      }
+    }catch(e){}
+
     if(!hasCap()){
       setupNetwork();
       setupBackButton();
@@ -415,7 +577,7 @@
     setupBackButton();
     try{ await ensureNotifChannel(); }catch(e){}
     try{
-      if(/billing\.html/i.test(location.pathname || "") && navigator.wakeLock && navigator.wakeLock.request){
+      if(/billing\\.html/i.test(location.pathname || "") && navigator.wakeLock && navigator.wakeLock.request){
         try{ window.__orbitWake = await navigator.wakeLock.request("screen"); }catch(e){}
       }
     }catch(e){}
@@ -453,22 +615,37 @@
       try{ return sessionStorage.getItem("orbit_offline_banner_dismissed") === "1"; }catch(e){ return false; }
     }
     function setOnline(ok){
+      if(_lastOnline === ok) return;
+      _lastOnline = ok;
+
       if(ok){
         bar.style.display = "none";
         try{ sessionStorage.removeItem("orbit_offline_banner_dismissed"); }catch(e){}
         bar.removeAttribute("data-dismissed");
+        try{ sessionStorage.removeItem("orbit_skip_live_redirect"); }catch(e){}
         try{
           if(hasCap() && PREFER_LIVE && !isOnLiveHost() && (isLocalCapOrigin() || location.protocol === "file:")){
             if(sessionStorage.getItem("orbit_live_redirected") !== "1"){
-              tryHybridLiveRedirect();
+              exportDbToNative().then(function(){ tryHybridLiveRedirect(); });
             }
+          } else if(hasCap() && isOnLiveHost()){
+            importDbFromNative({ merge: false });
           }
         }catch(e){}
         return;
       }
+
       if(isDismissed()){ bar.style.display = "none"; }
       else { bar.style.display = "block"; }
       try{ showOfflineModal(); }catch(e){}
+
+      if(hasCap() && isOnLiveHost()){
+        switchToOfflineLocal();
+        return;
+      }
+      if(hasCap() && isLocalCapOrigin()){
+        try{ exportDbToNative(); }catch(e){}
+      }
     }
     if(Network && Network.getStatus){
       Network.getStatus().then(function(s){ setOnline(!!s.connected); }).catch(function(){});
@@ -478,6 +655,11 @@
       window.addEventListener("online", function(){ setOnline(true); });
       window.addEventListener("offline", function(){ setOnline(false); });
     }
+
+    try{
+      window.addEventListener("online", function(){ setOnline(true); });
+      window.addEventListener("offline", function(){ setOnline(false); });
+    }catch(e){}
   }
 
   function setupBackButton(){

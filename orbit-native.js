@@ -3,8 +3,6 @@
   window.__orbitNativeLoaded = true;
   function hasCap(){ return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
   function plugin(n){ try{ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[n]; }catch(e){ return null; } }
-  var LIVE_URL = "https://orbitbillsphone.onrender.com";
-  var PREFER_LIVE = false;
   function blobToBase64(blob){ return new Promise(function(resolve, reject){ var r = new FileReader(); r.onload = function(){ var s = String(r.result || ""); var i = s.indexOf(","); resolve(i >= 0 ? s.slice(i + 1) : s); }; r.onerror = reject; r.readAsDataURL(blob); }); }
   window.__orbitNativeShare = async function(opts){
     opts = opts || {}; var title = opts.title || "Invoice · TechSerenia"; var text = opts.text || "Invoice from TechSerenia"; var filename = opts.filename || ("invoice-" + Date.now() + ".png"); var blob = opts.blob; var Share = plugin("Share"); var Filesystem = plugin("Filesystem");
@@ -19,7 +17,7 @@
         if(uri){ try{ await Share.share({ title: title, text: text, dialogTitle: "Share invoice", files: [uri], url: uri }); return true; }catch(eFiles){ try{ await Share.share({ title: title, text: text, dialogTitle: "Share invoice", url: uri }); return true; }catch(eUrl){} } }
       }catch(eCap){}
     }
-    if(navigator.share && blob && filename){ try{ var file = new File([blob], filename, { type: blob.type || (/".pdf$/i.test(filename) ? "application/pdf" : "image/png") }); var data = { title: title, text: text, files: [file] }; if(navigator.canShare && !navigator.canShare(data)){ await navigator.share({ title: title, text: text }); return true; } await navigator.share(data); return true; }catch(e){ if(e && e.name === "AbortError") return true; } }
+    if(navigator.share && blob && filename){ try{ var file = new File([blob], filename, { type: blob.type || (/\.pdf$/i.test(filename) ? "application/pdf" : "image/png") }); var data = { title: title, text: text, files: [file] }; if(navigator.canShare && !navigator.canShare(data)){ await navigator.share({ title: title, text: text }); return true; } await navigator.share(data); return true; }catch(e){ if(e && e.name === "AbortError") return true; } }
     if(navigator.share){ try{ await navigator.share({ title: title, text: text, url: opts.url }); return true; }catch(e){ if(e && e.name === "AbortError") return true; } }
     return false;
   };
@@ -53,7 +51,19 @@
     };
     if(App && App.addListener){ App.addListener("backButton", function(){ var handled = false; try{ handled = !!window.__orbitAndroidBack(); }catch(e){} if(!handled && App.exitApp) App.exitApp(); }); }
   }
-  function ready(){ setupBackButton(); try{ var Splash = plugin("SplashScreen"); if(Splash && Splash.hide) Splash.hide({ fadeOutDuration: 250 }); }catch(e){} }
+  function loadPostPay(){
+    try{
+      if(window.__orbitPostPayLoaded) return;
+      if(document.querySelector('script[src*="orbit-postpay"]')) return;
+      var s = document.createElement("script");
+      s.src = "orbit-postpay.js";
+      s.async = true;
+      (document.head || document.body || document.documentElement).appendChild(s);
+    }catch(e){}
+  }
+  function ready(){ setupBackButton(); loadPostPay(); try{ var Splash = plugin("SplashScreen"); if(Splash && Splash.hide) Splash.hide({ fadeOutDuration: 250 }); }catch(e){} }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready); else ready();
   window.addEventListener("load", ready);
+  setTimeout(loadPostPay, 300);
+  setTimeout(loadPostPay, 1200);
 })();

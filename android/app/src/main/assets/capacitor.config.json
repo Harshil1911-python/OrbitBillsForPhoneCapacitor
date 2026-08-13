@@ -1,0 +1,40 @@
+{
+	"appId": "com.techserenia.orbitbills",
+	"appName": "TechSerenia",
+	"webDir": "www",
+	"android": {
+		"allowMixedContent": false,
+		"backgroundColor": "#0b3d91"
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 1800,
+			"launchAutoHide": true,
+			"backgroundColor": "#0b3d91",
+			"androidSplashResourceName": "splash",
+			"androidScaleType": "CENTER",
+			"showSpinner": false,
+			"splashFullScreen": true,
+			"splashImmersive": true
+		},
+		"StatusBar": {
+			"style": "LIGHT",
+			"backgroundColor": "#0b3d91",
+			"overlaysWebView": false
+		},
+		"Keyboard": {
+			"resize": "body",
+			"resizeOnFullScreen": true
+		}
+	},
+	"server": {
+		"androidScheme": "https",
+		"cleartext": false,
+		"allowNavigation": [
+			"orbitbillsphone.onrender.com",
+			"orbitbillsphone.onrender.com",
+			"orbitbillsdemo2.onrender.com",
+			"*.onrender.com"
+		]
+	}
+}

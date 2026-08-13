@@ -51,7 +51,19 @@
     };
     if(App && App.addListener){ App.addListener("backButton", function(){ var handled = false; try{ handled = !!window.__orbitAndroidBack(); }catch(e){} if(!handled && App.exitApp) App.exitApp(); }); }
   }
-  function ready(){ setupBackButton(); try{ var Splash = plugin("SplashScreen"); if(Splash && Splash.hide) Splash.hide({ fadeOutDuration: 250 }); }catch(e){} }
+  function loadPostPay(){
+    try{
+      if(window.__orbitPostPayLoaded) return;
+      if(document.querySelector('script[src*="orbit-postpay"]')) return;
+      var s = document.createElement("script");
+      s.src = "orbit-postpay.js";
+      s.async = true;
+      (document.head || document.body || document.documentElement).appendChild(s);
+    }catch(e){}
+  }
+  function ready(){ setupBackButton(); loadPostPay(); try{ var Splash = plugin("SplashScreen"); if(Splash && Splash.hide) Splash.hide({ fadeOutDuration: 250 }); }catch(e){} }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready); else ready();
   window.addEventListener("load", ready);
+  setTimeout(loadPostPay, 300);
+  setTimeout(loadPostPay, 1200);
 })();

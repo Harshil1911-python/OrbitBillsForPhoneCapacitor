@@ -1,32 +1,50 @@
 #!/usr/bin/env python3
-"""Apply TechSerenia brand icon + splash into resources/ and android/res."""
+"""Apply TechSerenia brand icon + splash into resources/ and android/res.
+
+Looks for the master logo in this order:
+  1) resources/icon.png
+  2) scripts/icon.png
+  3) concatenated scripts/icon.b64.* (optional)
+
+Generates all Android mipmap sizes + splash (logo on brand blue #0b3d91).
+"""
 from __future__ import annotations
 import base64, os, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
+BRAND = (11, 61, 145)  # #0b3d91
 
 def write_bytes(path: Path, data: bytes):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     print("wrote", path.relative_to(ROOT), len(data), "bytes")
 
-def load_b64(prefix: str) -> str:
-    single = HERE / f"{prefix}.b64"
-    if single.is_file():
-        return single.read_text().strip()
+def load_master_png() -> bytes:
+    for p in (ROOT / "resources" / "icon.png", HERE / "icon.png", ROOT / "icon.png"):
+        if p.is_file() and p.stat().st_size > 1000:
+            print("using master icon:", p)
+            return p.read_bytes()
     parts = []
     i = 0
     while True:
-        p = HERE / f"{prefix}.b64.{i}"
-        if not p.is_file():
+        c = HERE / f"icon.b64.{i}"
+        if not c.is_file():
             break
-        parts.append(p.read_text().strip())
+        parts.append(c.read_text().strip())
         i += 1
-    if not parts:
-        raise FileNotFoundError(f"Missing {prefix}.b64 or chunks")
-    return "".join(parts)
+    if parts:
+        print("using scripts/icon.b64.* chunks")
+        return base64.b64decode("".join(parts))
+    single = HERE / "icon.b64"
+    if single.is_file():
+        return base64.b64decode(single.read_text().strip())
+    raise SystemExit(
+        "ERROR: No icon found.\n"
+        "Upload your 1024x1024 PNG to: resources/icon.png\n"
+        "GitHub → OrbitBillsForPhoneCapacitor → Add file → Upload files"
+    )
 
 def main():
     try:
@@ -35,32 +53,51 @@ def main():
         os.system(f"{sys.executable} -m pip install pillow -q")
         from PIL import Image, ImageDraw
 
-    icon_raw = base64.b64decode(load_b64("icon"))
-    splash_raw = base64.b64decode(load_b64("splash"))
-    write_bytes(ROOT / "resources" / "icon.png", icon_raw)
-    write_bytes(ROOT / "resources" / "splash.png", splash_raw)
-    write_bytes(ROOT / "resources" / "logo.png", icon_raw)
+    import io
+    raw = load_master_png()
+    src = Image.open(io.BytesIO(raw)).convert("RGBA")
+    src = src.resize((1024, 1024), Image.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    src.save(buf, format="PNG", optimize=True)
+    write_bytes(ROOT / "resources" / "icon.png", buf.getvalue())
+    write_bytes(ROOT / "resources" / "logo.png", buf.getvalue())
 
-    src = Image.open(ROOT / "resources" / "icon.png").convert("RGBA")
+    splash_size = 2048
+    splash = Image.new("RGBA", (splash_size, splash_size), BRAND + (255,))
+    logo = src.copy()
+    px = logo.load()
+    w, h = logo.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if r > 235 and g > 235 and b > 235:
+                px[x, y] = (r, g, b, 0)
+    logo.thumbnail((int(splash_size * 0.42), int(splash_size * 0.42)), Image.Resampling.LANCZOS)
+    x = (splash_size - logo.size[0]) // 2
+    y = (splash_size - logo.size[1]) // 2
+    splash.paste(logo, (x, y), logo)
+    sbuf = io.BytesIO()
+    splash.convert("RGB").save(sbuf, format="PNG", optimize=True)
+    write_bytes(ROOT / "resources" / "splash.png", sbuf.getvalue())
 
-    def fit_logo(logo, canvas_size, logo_ratio=0.66):
+    def fit_logo(logo_img, canvas_size, logo_ratio=0.66):
         canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
         target = int(canvas_size * logo_ratio)
-        lr = logo.copy()
+        lr = logo_img.copy()
         lr.thumbnail((target, target), Image.Resampling.LANCZOS)
-        x = (canvas_size - lr.size[0]) // 2
-        y = (canvas_size - lr.size[1]) // 2
-        canvas.paste(lr, (x, y), lr)
+        xx = (canvas_size - lr.size[0]) // 2
+        yy = (canvas_size - lr.size[1]) // 2
+        canvas.paste(lr, (xx, yy), lr)
         return canvas
 
-    def with_white_bg(logo, size):
+    def with_white_bg(logo_img, size):
         canvas = Image.new("RGBA", (size, size), (255, 255, 255, 255))
-        lr = logo.copy()
+        lr = logo_img.copy()
         target = int(size * 0.78)
         lr.thumbnail((target, target), Image.Resampling.LANCZOS)
-        x = (size - lr.size[0]) // 2
-        y = (size - lr.size[1]) // 2
-        canvas.paste(lr, (x, y), lr)
+        xx = (size - lr.size[0]) // 2
+        yy = (size - lr.size[1]) // 2
+        canvas.paste(lr, (xx, yy), lr)
         return canvas
 
     def round_mask(size):
@@ -78,8 +115,7 @@ def main():
         rounded = icon.copy()
         rounded.putalpha(round_mask(sz))
         rounded.save(folder / "ic_launcher_round.png")
-        fg = fit_logo(src, sz, 0.66)
-        fg.save(folder / "ic_launcher_foreground.png")
+        fit_logo(src, sz, 0.66).save(folder / "ic_launcher_foreground.png")
         print("mipmap", density, sz)
 
     android_res = ROOT / "android" / "app" / "src" / "main" / "res"
@@ -121,7 +157,7 @@ def main():
 """)
         print("adaptive icon xml ok")
     else:
-        print("android/res not found yet — resources only")
+        print("android/res not found yet — resources generated; run after cap sync")
 
     print("branding applied OK")
 

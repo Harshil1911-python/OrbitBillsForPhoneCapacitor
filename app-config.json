@@ -1,9 +1,9 @@
 {
   "appName": "TechSerenia",
   "appId": "com.techserenia.orbitbills",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "useLiveWebsite": false,
-  "preferLiveWhenOnline": true,
+  "preferLiveWhenOnline": false,
   "websiteUrl": "https://orbitbillsphone.onrender.com",
   "brandColor": "#0b3d91",
   "statusBarStyle": "LIGHT",

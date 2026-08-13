@@ -12,6 +12,22 @@ def write_bytes(path: Path, data: bytes):
     path.write_bytes(data)
     print("wrote", path.relative_to(ROOT), len(data), "bytes")
 
+def load_b64(prefix: str) -> str:
+    single = HERE / f"{prefix}.b64"
+    if single.is_file():
+        return single.read_text().strip()
+    parts = []
+    i = 0
+    while True:
+        p = HERE / f"{prefix}.b64.{i}"
+        if not p.is_file():
+            break
+        parts.append(p.read_text().strip())
+        i += 1
+    if not parts:
+        raise FileNotFoundError(f"Missing {prefix}.b64 or chunks")
+    return "".join(parts)
+
 def main():
     try:
         from PIL import Image, ImageDraw
@@ -19,10 +35,8 @@ def main():
         os.system(f"{sys.executable} -m pip install pillow -q")
         from PIL import Image, ImageDraw
 
-    icon_b64 = (HERE / "icon.b64").read_text().strip()
-    splash_b64 = (HERE / "splash.b64").read_text().strip()
-    icon_raw = base64.b64decode(icon_b64)
-    splash_raw = base64.b64decode(splash_b64)
+    icon_raw = base64.b64decode(load_b64("icon"))
+    splash_raw = base64.b64decode(load_b64("splash"))
     write_bytes(ROOT / "resources" / "icon.png", icon_raw)
     write_bytes(ROOT / "resources" / "splash.png", splash_raw)
     write_bytes(ROOT / "resources" / "logo.png", icon_raw)
